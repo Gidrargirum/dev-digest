@@ -71,6 +71,13 @@ export function FindingsTab({
     setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
   }, []);
 
+  // Lets each ReviewRunAccordion show its run's cost/tokens without a second
+  // fetch — prRuns already carries them, keyed by run_id.
+  const runSummaryById = React.useMemo(
+    () => new Map((prRuns ?? []).map((r) => [r.run_id, r])),
+    [prRuns],
+  );
+
   return (
     <section>
       {liveRunIds.length > 0 && (
@@ -164,6 +171,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            runSummary={review.run_id ? runSummaryById.get(review.run_id) : undefined}
           />
         ))
       )}
