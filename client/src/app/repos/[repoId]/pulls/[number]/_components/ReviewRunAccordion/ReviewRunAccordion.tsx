@@ -7,9 +7,10 @@
 
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
-import type { ReviewRecord, Verdict } from "@devdigest/shared";
+import type { ReviewRecord, RunSummary, Verdict } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
+import { RunCostBadge } from "@/components/run-cost-badge";
 import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
 
 const VERDICT_COLOR: Record<string, string> = {
@@ -31,6 +32,7 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  runSummary,
 }: {
   review: ReviewRecord;
   prId: string;
@@ -41,6 +43,9 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** This run's cost/token stats (matched by run_id); undefined for reviews
+   *  with no matching agent_runs row (e.g. legacy CI-imported reviews). */
+  runSummary?: RunSummary;
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -79,58 +84,70 @@ export function ReviewRunAccordion({
         style={{
           width: "100%",
           display: "flex",
-          alignItems: "center",
-          gap: 12,
+          flexDirection: "column",
+          gap: 4,
           padding: "13px 16px",
           cursor: "pointer",
           color: "var(--text-primary)",
         }}
       >
-        <Icon.Cpu size={15} style={{ color: "var(--text-muted)" }} />
-        <span style={{ fontWeight: 600, fontSize: 14 }}>{review.agent_name ?? "Agent"}</span>
-        {review.verdict && (
-          <Badge color={verdictColor} bg="transparent">
-            {review.verdict.replace("_", " ")}
-          </Badge>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <Icon.Cpu size={15} style={{ color: "var(--text-muted)" }} />
+          <span style={{ fontWeight: 600, fontSize: 14 }}>{review.agent_name ?? "Agent"}</span>
+          {review.verdict && (
+            <Badge color={verdictColor} bg="transparent">
+              {review.verdict.replace("_", " ")}
+            </Badge>
+          )}
+          <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
+            {findings.length} finding{findings.length === 1 ? "" : "s"}
+            {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
+          </span>
+          <span style={{ flex: 1 }} />
+          {review.score != null && (
+            <Badge mono color="var(--text-secondary)">
+              {review.score}
+            </Badge>
+          )}
+          <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
+            {formatWhen(review.created_at)}
+          </span>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              if (window.confirm(`Delete this "${review.agent_name ?? "agent"}" review run and its findings?`)) {
+                del.mutate(review.id);
+              }
+            }}
+            disabled={del.isPending}
+            title="Delete this review run"
+            aria-label="Delete this review run"
+            style={{
+              background: "none",
+              border: "none",
+              cursor: del.isPending ? "not-allowed" : "pointer",
+              color: "var(--text-muted)",
+              display: "inline-flex",
+              padding: 4,
+            }}
+          >
+            <Icon.Trash size={14} style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined} />
+          </button>
+          <Icon.ChevronDown
+            size={16}
+            style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--text-muted)" }}
+          />
+        </div>
+        {runSummary && (
+          <div style={{ paddingLeft: 27 }}>
+            <RunCostBadge
+              costUsd={runSummary.cost_usd}
+              tokensIn={runSummary.tokens_in}
+              tokensOut={runSummary.tokens_out}
+              variant="detailed"
+            />
+          </div>
         )}
-        <span style={{ fontSize: 12.5, color: "var(--text-muted)" }}>
-          {findings.length} finding{findings.length === 1 ? "" : "s"}
-          {blockers > 0 ? ` · ${blockers} blocker${blockers === 1 ? "" : "s"}` : ""}
-        </span>
-        <span style={{ flex: 1 }} />
-        {review.score != null && (
-          <Badge mono color="var(--text-secondary)">
-            {review.score}
-          </Badge>
-        )}
-        <span className="mono" style={{ fontSize: 12, color: "var(--text-muted)" }}>
-          {formatWhen(review.created_at)}
-        </span>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            if (window.confirm(`Delete this "${review.agent_name ?? "agent"}" review run and its findings?`)) {
-              del.mutate(review.id);
-            }
-          }}
-          disabled={del.isPending}
-          title="Delete this review run"
-          aria-label="Delete this review run"
-          style={{
-            background: "none",
-            border: "none",
-            cursor: del.isPending ? "not-allowed" : "pointer",
-            color: "var(--text-muted)",
-            display: "inline-flex",
-            padding: 4,
-          }}
-        >
-          <Icon.Trash size={14} style={del.isPending ? { animation: "ddspin 1s linear infinite" } : undefined} />
-        </button>
-        <Icon.ChevronDown
-          size={16}
-          style={{ transform: open ? "rotate(180deg)" : "none", transition: "transform .15s", color: "var(--text-muted)" }}
-        />
       </div>
 
       {open && (
