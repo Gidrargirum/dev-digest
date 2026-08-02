@@ -78,6 +78,17 @@ export function FindingsTab({
     [prRuns],
   );
 
+  // Same idea for the timeline's severity breakdown: the persisted reviews are
+  // already loaded and carry the run they came from, so no extra request.
+  const findingsByRun = React.useMemo(() => {
+    const m = new Map<string, FindingRecord[]>();
+    for (const r of runs) {
+      if (!r.run_id) continue;
+      m.set(r.run_id, [...(m.get(r.run_id) ?? []), ...r.findings]);
+    }
+    return m;
+  }, [runs]);
+
   return (
     <section>
       {liveRunIds.length > 0 && (
@@ -138,6 +149,7 @@ export function FindingsTab({
           <RunHistory
             runs={prRuns ?? []}
             commits={prCommits}
+            findingsByRun={findingsByRun}
             onOpenTrace={handleOpenTrace}
             onGoToReview={handleGoToReview}
             onDelete={handleDelete}

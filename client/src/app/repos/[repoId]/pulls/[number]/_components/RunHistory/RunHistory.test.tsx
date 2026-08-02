@@ -5,9 +5,9 @@
  * and shows the review score ring.
  */
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
-import type { RunSummary } from "@devdigest/shared";
+import type { FindingRecord, RunSummary } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
 import { RunHistory } from "./RunHistory";
 
@@ -35,12 +35,30 @@ function run(o: Partial<RunSummary>): RunSummary {
   };
 }
 
-function renderRuns(runs: RunSummary[]) {
+function renderRuns(runs: RunSummary[], findingsByRun?: Map<string, FindingRecord[]>) {
   return render(
     <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
-      <RunHistory runs={runs} onOpenTrace={() => {}} />
+      <RunHistory runs={runs} findingsByRun={findingsByRun} onOpenTrace={() => {}} />
     </NextIntlClientProvider>,
   );
+}
+
+function finding(id: string, severity: string, over: Partial<FindingRecord> = {}): FindingRecord {
+  return {
+    id,
+    review_id: "r1",
+    severity: severity as FindingRecord["severity"],
+    category: "perf",
+    title: `${severity} in this run`,
+    file: "src/api/users.ts",
+    start_line: 45,
+    end_line: 52,
+    rationale: "The loop calls the DB once per user.",
+    confidence: 0.86,
+    accepted_at: null,
+    dismissed_at: null,
+    ...over,
+  };
 }
 
 describe("RunHistory — outcome badge", () => {
@@ -72,5 +90,47 @@ describe("RunHistory — outcome badge", () => {
   it("a running run reads 'running'", () => {
     renderRuns([run({ status: "running", score: null, blockers: null })]);
     expect(screen.getByText("running")).toBeInTheDocument();
+  });
+});
+
+describe("RunHistory — per-run findings breakdown", () => {
+  it("shows severity counters for the run, dismissed findings excluded", () => {
+    renderRuns(
+      [run({ status: "done", findings_count: 3, blockers: 2, score: 38 })],
+      new Map([
+        [
+          "run-1",
+          [
+            finding("f1", "CRITICAL"),
+            finding("f2", "CRITICAL"),
+            finding("f3", "WARNING"),
+            finding("f4", "WARNING", { dismissed_at: "2026-06-14T00:00:00.000Z" }),
+          ],
+        ],
+      ]),
+    );
+    expect(screen.getByLabelText("Critical: 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Warning: 1")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/^Suggestion/)).not.toBeInTheDocument();
+    // The blocker suffix stays next to the counters.
+    expect(screen.getByText(/2 blockers/)).toBeInTheDocument();
+  });
+
+  it("opens a popover listing this run's findings", async () => {
+    renderRuns(
+      [run({ status: "done", findings_count: 1, blockers: 1, score: 38 })],
+      new Map([["run-1", [finding("f1", "CRITICAL")]]]),
+    );
+    fireEvent.mouseEnter(screen.getByRole("button", { name: "Show findings" }));
+    await waitFor(() => expect(screen.getByRole("tooltip")).toBeInTheDocument());
+    expect(screen.getByText("1 findings in this run")).toBeInTheDocument();
+    expect(screen.getByText("CRITICAL in this run")).toBeInTheDocument();
+    expect(screen.getByText("src/api/users.ts:45-52")).toBeInTheDocument();
+  });
+
+  it("falls back to the run's denormalized count when no review is loaded", () => {
+    renderRuns([run({ status: "done", findings_count: 3, blockers: 0, score: 72 })]);
+    expect(screen.getByText("3 finding(s)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show findings" })).not.toBeInTheDocument();
   });
 });
