@@ -123,7 +123,7 @@ describe("RunHistory — per-run findings breakdown", () => {
     );
     fireEvent.mouseEnter(screen.getByRole("button", { name: "Show findings" }));
     await waitFor(() => expect(screen.getByRole("tooltip")).toBeInTheDocument());
-    expect(screen.getByText("1 findings in this run")).toBeInTheDocument();
+    expect(screen.getByText("1 finding(s) in this run")).toBeInTheDocument();
     expect(screen.getByText("CRITICAL in this run")).toBeInTheDocument();
     expect(screen.getByText("src/api/users.ts:45-52")).toBeInTheDocument();
   });

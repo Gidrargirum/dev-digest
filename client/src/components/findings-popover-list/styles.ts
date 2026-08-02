@@ -15,17 +15,20 @@ export const s = {
   } satisfies CSSProperties,
   list: { display: "flex", flexDirection: "column", gap: 12 } satisfies CSSProperties,
   item: { display: "flex", flexDirection: "column", gap: 5, minWidth: 0 } satisfies CSSProperties,
+  // The severity badge stays on the first line; a long title wraps beside it
+  // rather than pushing the badge onto a line of its own.
   titleRow: {
     display: "flex",
-    alignItems: "center",
+    alignItems: "flex-start",
     gap: 8,
-    flexWrap: "wrap",
     minWidth: 0,
   } satisfies CSSProperties,
   title: {
     fontSize: 13,
     fontWeight: 650,
     color: "var(--text-primary)",
+    flex: 1,
+    minWidth: 0,
   } satisfies CSSProperties,
   metaRow: { display: "flex", alignItems: "center", gap: 10 } satisfies CSSProperties,
   file: { fontSize: 12, color: "var(--accent-text)" } satisfies CSSProperties,

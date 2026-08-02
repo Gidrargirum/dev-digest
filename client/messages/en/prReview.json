@@ -109,8 +109,8 @@
     "deleteRun": "Delete run"
   },
   "findingsPopover": {
-    "title": "{count} findings",
-    "titleInRun": "{count} findings in this run",
+    "title": "{count} finding(s)",
+    "titleInRun": "{count} finding(s) in this run",
     "more": "+{count} more",
     "empty": "No findings for this pull request.",
     "error": "Couldn’t load findings.",

@@ -6,7 +6,7 @@ for features touching more than one package. Normative voice — "must",
 
 | Specification | About |
 |---|---|
-| _(empty)_ | — |
+| [findings-severity-breakdown.md](./findings-severity-breakdown.md) | FINDINGS counters + hover popover on the PR list and the Agent runs timeline |
 
 ## What belongs here
 
