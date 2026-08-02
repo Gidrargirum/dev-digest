@@ -15,6 +15,7 @@ import {
   Settings,
   Repo,
   PrDetail,
+  PrMeta,
 } from '@devdigest/shared';
 
 /**
@@ -45,6 +46,31 @@ describe('AI contracts parse fixtures', () => {
     });
     expect(review.findings).toHaveLength(1);
     expect(review.score).toBe(61);
+  });
+
+  it('PrMeta.findings_breakdown (PR list FINDINGS column)', () => {
+    const base = {
+      number: 482,
+      title: 'Add rate limiting',
+      author: 'marisa.koch',
+      branch: 'feat/rl',
+      base: 'main',
+      head_sha: 'a1b2c3d4',
+      additions: 247,
+      deletions: 38,
+      files_count: 9,
+      status: 'needs_review' as const,
+    };
+    expect(
+      PrMeta.parse({ ...base, findings_breakdown: { critical: 2, warning: 2, suggestion: 2 } })
+        .findings_breakdown,
+    ).toEqual({ critical: 2, warning: 2, suggestion: 2 });
+    // Absent / null both mean "nothing to show", never a zeroed object.
+    expect(PrMeta.parse(base).findings_breakdown).toBeUndefined();
+    expect(PrMeta.parse({ ...base, findings_breakdown: null }).findings_breakdown).toBeNull();
+    expect(() =>
+      PrMeta.parse({ ...base, findings_breakdown: { critical: 1, warning: 0 } }),
+    ).toThrow();
   });
 
   it('lethal-trifecta Finding variant', () => {

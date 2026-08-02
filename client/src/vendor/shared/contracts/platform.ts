@@ -177,7 +177,8 @@ export const PrMeta = z.object({
   cost_usd: z.number().nullish(),
   // Per-severity finding counts across every review of this PR, dismissed
   // findings excluded (list endpoint only; absent elsewhere, e.g. PR detail).
-  // Null when the PR has never been reviewed — never a zeroed-out object.
+  // Null when the PR has no countable findings at all (never reviewed, a clean
+  // review, or everything dismissed) — never a zeroed-out object.
   findings_breakdown: FindingsBreakdown.nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;

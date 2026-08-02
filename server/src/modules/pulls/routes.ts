@@ -1,7 +1,14 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
-import type { PrMeta, PrDetail, GitHubClient, PrReviewComment } from '@devdigest/shared';
+import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import type {
+  PrMeta,
+  PrDetail,
+  GitHubClient,
+  PrReviewComment,
+  FindingsBreakdown,
+  Severity,
+} from '@devdigest/shared';
 import { PrCommentInput } from '@devdigest/shared';
 import * as t from '../../db/schema.js';
 import { getContext } from '../_shared/context.js';
@@ -19,6 +26,13 @@ import { deriveReviewStatus } from './status.js';
  * Import is idempotent (unique repo_id+number). Review trigger is MANUAL
  * and owned by A2 — this module only imports/reads.
  */
+
+/** DB severity (free text, UPPERCASE) → `FindingsBreakdown` key. */
+const SEVERITY_KEY: Record<string, keyof FindingsBreakdown | undefined> = {
+  CRITICAL: 'critical',
+  WARNING: 'warning',
+  SUGGESTION: 'suggestion',
+} satisfies Record<Severity, keyof FindingsBreakdown>;
 export default async function pullsRoutes(appBase: FastifyInstance) {
   const app = appBase.withTypeProvider<ZodTypeProvider>();
   const { container } = app;
@@ -113,8 +127,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
 
     // Latest-review SCORE per PR for the list's score ring. Computed on read
     // from reviews (no FK denorm); the list is small, so one IN-query + JS
-    // grouping is cheap. (The per-severity FINDINGS breakdown is intentionally
-    // not surfaced on the list — findings live on the PR detail page.)
+    // grouping is cheap.
     const prIds = rows.map((r) => r.id);
     const latestReviewByPr = new Map<string, { score: number | null }>();
     if (prIds.length > 0) {
@@ -145,6 +158,39 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
       }
     }
 
+    // Per-severity FINDINGS breakdown per PR, for the list's findings column.
+    // Counted across ALL of the PR's reviews (not just the latest one, unlike
+    // the score above) so the column matches the sum shown on the Agent runs
+    // timeline. `kind = 'review'` keeps a future consolidated 'summary' review
+    // from double-counting the same findings; dismissed ones are excluded, in
+    // line with how the UI counts blockers.
+    const breakdownByPr = new Map<string, FindingsBreakdown>();
+    if (prIds.length > 0) {
+      const severityRows = await container.db
+        .select({
+          prId: t.reviews.prId,
+          severity: t.findings.severity,
+          n: sql<number>`count(*)`,
+        })
+        .from(t.findings)
+        .innerJoin(t.reviews, eq(t.findings.reviewId, t.reviews.id))
+        .where(
+          and(
+            inArray(t.reviews.prId, prIds),
+            eq(t.reviews.kind, 'review'),
+            isNull(t.findings.dismissedAt),
+          ),
+        )
+        .groupBy(t.reviews.prId, t.findings.severity);
+      for (const row of severityRows) {
+        const key = SEVERITY_KEY[row.severity];
+        if (!key) continue; // severity is free text in the DB — ignore strays
+        const acc = breakdownByPr.get(row.prId) ?? { critical: 0, warning: 0, suggestion: 0 };
+        acc[key] += Number(row.n);
+        breakdownByPr.set(row.prId, acc);
+      }
+    }
+
     const now = Date.now();
     return rows.map((r) => {
       const review = latestReviewByPr.get(r.id);
@@ -170,6 +216,7 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         updated_at: r.updatedAt?.toISOString() ?? null,
         score: review ? review.score : null,
         cost_usd: costByPr.get(r.id) ?? null,
+        findings_breakdown: breakdownByPr.get(r.id) ?? null,
       };
     });
   });
