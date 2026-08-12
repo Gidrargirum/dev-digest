@@ -48,6 +48,9 @@ export function usePrRuns(prId: string | null | undefined) {
 }
 
 // ---- Persisted reviews + findings for a PR ----
+/** Shared cache key with the PR list's findings popover, which mounts this hook
+    only while the popover is open — so a hovered row fetches once, and a second
+    hover (or opening the PR) is served from cache. */
 export function usePrReviews(prId: string | null | undefined) {
   return useQuery({
     queryKey: ["reviews", prId],

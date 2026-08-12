@@ -3,7 +3,14 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Badge, Icon, CircularScore, type IconName } from "@devdigest/ui";
-import type { RunSummary, PrCommit } from "@devdigest/shared";
+import type { RunSummary, PrCommit, FindingRecord } from "@devdigest/shared";
+import {
+  FindingsBreakdownBadges,
+  countBySeverity,
+  sortBySeverity,
+} from "@/components/findings-breakdown";
+import { FindingsPopoverList } from "@/components/findings-popover-list";
+import { HoverCard } from "@/components/hover-card";
 
 /**
  * PR timeline — every agent run interleaved with the PR's commits, newest-first
@@ -62,6 +69,16 @@ const iconBtnStyle: React.CSSProperties = {
 
 // Commits are markers, not actions — lighter (dashed, transparent) so they read
 // as separators between the runs they sit chronologically between.
+// The findings line under the agent name: severity counters (hoverable) plus
+// the blocker suffix.
+const runMetaStyle: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 6,
+  fontSize: 12,
+  color: "var(--text-muted)",
+};
+
 const commitRowStyle: React.CSSProperties = {
   display: "flex",
   alignItems: "center",
@@ -87,12 +104,16 @@ function tsOf(s: string | null | undefined): number {
 export function RunHistory({
   runs,
   commits = [],
+  findingsByRun,
   onOpenTrace,
   onGoToReview,
   onDelete,
 }: {
   runs: RunSummary[];
   commits?: PrCommit[];
+  /** run_id → that run's findings, from the reviews already loaded by the tab.
+      A run with no persisted review (failed/cancelled) is simply absent. */
+  findingsByRun?: Map<string, FindingRecord[]>;
   /** Open the trace + log drawer for a run (the logs icon). */
   onOpenTrace: (runId: string) => void;
   /** Jump to this run's inline review accordion below (clicking the agent name). */
@@ -149,6 +170,10 @@ export function RunHistory({
         const r = item.run;
         const o = outcomeOf(r);
         const settled = r.status === "done";
+        // Findings of this run, dismissed ones dropped — same rule the PR list
+        // counts by, so the two screens never disagree.
+        const runFindings = sortBySeverity(findingsByRun?.get(r.run_id) ?? []);
+        const runCounts = countBySeverity(runFindings);
         return (
           <div key={`run:${r.run_id}`} style={rowStyle}>
             <Badge color={o.color} bg={o.bg} icon={o.icon}>
@@ -189,8 +214,24 @@ export function RunHistory({
                 </div>
               )}
               {settled && (
-                <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                  {t("runStatus.findings", { count: r.findings_count ?? 0 })}
+                <div style={runMetaStyle}>
+                  {runFindings.length > 0 ? (
+                    <HoverCard
+                      label={t("findingsPopover.trigger")}
+                      panel={
+                        <FindingsPopoverList
+                          findings={runFindings}
+                          title={t("findingsPopover.titleInRun", { count: runFindings.length })}
+                        />
+                      }
+                    >
+                      <FindingsBreakdownBadges counts={runCounts} />
+                    </HoverCard>
+                  ) : (
+                    // No persisted review for this run (or everything dismissed):
+                    // fall back to the denormalized count on the run row.
+                    <span>{t("runStatus.findings", { count: r.findings_count ?? 0 })}</span>
+                  )}
                   {(r.blockers ?? 0) > 0 ? t("runStatus.blockers", { count: r.blockers ?? 0 }) : ""}
                 </div>
               )}

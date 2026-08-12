@@ -11,6 +11,18 @@ import { z } from 'zod';
 export const Severity = z.enum(['CRITICAL', 'WARNING', 'SUGGESTION']);
 export type Severity = z.infer<typeof Severity>;
 
+/**
+ * Per-severity finding counts for a PR or a single run. Every severity is
+ * always present (0 when nothing was found) — hiding empty categories is a UI
+ * decision, not a transport one.
+ */
+export const FindingsBreakdown = z.object({
+  critical: z.number().int(),
+  warning: z.number().int(),
+  suggestion: z.number().int(),
+});
+export type FindingsBreakdown = z.infer<typeof FindingsBreakdown>;
+
 export const FindingCategory = z.enum(['bug', 'security', 'perf', 'style', 'test']);
 export type FindingCategory = z.infer<typeof FindingCategory>;
 

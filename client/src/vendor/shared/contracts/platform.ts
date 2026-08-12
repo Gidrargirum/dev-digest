@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { Provider } from './knowledge.js';
+import { FindingsBreakdown } from './findings.js';
 
 /**
  * Platform / scaffolding DTOs owned by F1:
@@ -174,6 +175,11 @@ export const PrMeta = z.object({
   // only; absent elsewhere, e.g. PR detail). Null when the PR has no
   // completed/costed runs — never 0.
   cost_usd: z.number().nullish(),
+  // Per-severity finding counts across every review of this PR, dismissed
+  // findings excluded (list endpoint only; absent elsewhere, e.g. PR detail).
+  // Null when the PR has no countable findings at all (never reviewed, a clean
+  // review, or everything dismissed) — never a zeroed-out object.
+  findings_breakdown: FindingsBreakdown.nullish(),
 });
 export type PrMeta = z.infer<typeof PrMeta>;
 
