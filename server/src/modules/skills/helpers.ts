@@ -190,7 +190,16 @@ function readEntryData(buf: Buffer, entry: CentralDirEntry): Buffer {
   const raw = buf.subarray(dataStart, dataStart + entry.compressedSize);
 
   if (entry.compressionMethod === 0) return Buffer.from(raw);
-  if (entry.compressionMethod === 8) return inflateRawSync(raw);
+  if (entry.compressionMethod === 8) {
+    // Cap enforced DURING decompression (not after): a small crafted DEFLATE
+    // stream can expand to gigabytes, and inflateRawSync throws as soon as
+    // this limit would be exceeded rather than materializing the full output.
+    try {
+      return inflateRawSync(raw, { maxOutputLength: MAX_IMPORT_BYTES });
+    } catch {
+      throw new Error('Archive contents too large');
+    }
+  }
   throw new Error(`Unsupported ZIP compression method: ${entry.compressionMethod}`);
 }
 
