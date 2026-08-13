@@ -1,6 +1,6 @@
 ---
 name: engineering-insights
-description: Captures durable engineering insights into the touched module's insights/INSIGHTS.md — what worked, what failed, codebase conventions, library quirks, recurring errors and their fixes, and open questions. Invoked automatically and unconditionally at the end of every session per this repo's CLAUDE.md session protocol. Also use mid-session when the user corrects the agent's approach, and when the user types /engineering-insights.
+description: Captures durable engineering insights into the touched module's insights/INSIGHTS.md — what worked, what failed, codebase conventions, library quirks, recurring errors and their fixes, and open questions. Invoked automatically and unconditionally at the end of every session per this repo's AGENTS.md session protocol. Also use mid-session when the user corrects the agent's approach, and when the user types /engineering-insights.
 ---
 
 # Engineering Insights
@@ -10,7 +10,7 @@ touched, so the next session in that module starts already knowing it. This
 is durable, cross-session memory — not a summary of the conversation.
 
 This skill runs **every session, unconditionally** (see the root
-`CLAUDE.md` session protocol). It is not a signal that something interesting
+`AGENTS.md` session protocol). It is not a signal that something interesting
 happened — deciding that is this skill's own first job, not the caller's.
 Most sessions will produce nothing worth recording, and exiting cleanly with
 no write is the normal, correct outcome, not a shortfall.

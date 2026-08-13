@@ -115,6 +115,10 @@ install_if_needed client
 # reviewer-core's RAW source is imported by the API at runtime (tsconfig alias);
 # without its deps the API crashes at boot with ERR_MODULE_NOT_FOUND. It uses npm.
 [ -d reviewer-core/node_modules ] || { log "installing deps in reviewer-core"; (cd reviewer-core && npm ci); }
+# e2e itself: the runner is `tsx run.ts`, so a missing node_modules fails with
+# `sh: tsx: command not found` at the very last step — after the whole stack is
+# already up, and reading like a PATH problem rather than a missing install.
+[ -d e2e/node_modules ] || { log "installing deps in e2e"; (cd e2e && npm install); }
 
 # --- migrate + seed the ISOLATED db ------------------------------------------
 # Hard guard: never let migrate/seed run against anything but the isolated port.

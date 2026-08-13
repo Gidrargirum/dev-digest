@@ -132,13 +132,57 @@ export const Skill = z.object({
 export type Skill = z.infer<typeof Skill>;
 
 export const CommunitySkill = z.object({
+  id: z.string(),
   name: z.string(),
   repo: z.string(),
   stars: z.number().int(),
   lang: z.string(),
   desc: z.string(),
+  type: SkillType,
+  body: z.string(),
 });
 export type CommunitySkill = z.infer<typeof CommunitySkill>;
+
+export const SkillVersion = z.object({
+  skill_id: z.string(),
+  version: z.number().int(),
+  body: z.string(),
+  created_at: z.string(),
+});
+export type SkillVersion = z.infer<typeof SkillVersion>;
+
+/** Result of parsing an uploaded file / archive before it is persisted. */
+export const SkillImportDraft = z.object({
+  name: z.string(),
+  description: z.string(),
+  type: SkillType,
+  body: z.string(),
+  /** Files present in an uploaded archive that were NOT read or executed. */
+  ignored_files: z.array(z.string()),
+});
+export type SkillImportDraft = z.infer<typeof SkillImportDraft>;
+
+export const SkillStatAgent = z.object({
+  id: z.string(),
+  name: z.string(),
+});
+export type SkillStatAgent = z.infer<typeof SkillStatAgent>;
+
+export const SkillCategoryCount = z.object({
+  category: z.string(),
+  count: z.number().int(),
+});
+export type SkillCategoryCount = z.infer<typeof SkillCategoryCount>;
+
+export const SkillStats = z.object({
+  used_by: z.array(SkillStatAgent),
+  findings_30d: z.number().int(),
+  accepted_30d: z.number().int(),
+  /** null when there is nothing to compute a rate from. */
+  accept_rate: z.number().min(0).max(100).nullable(),
+  by_category: z.array(SkillCategoryCount),
+});
+export type SkillStats = z.infer<typeof SkillStats>;
 
 // ---- Conventions ----
 export const ConventionCandidate = z.object({
@@ -195,6 +239,7 @@ export const AgentSkillLink = z.object({
   agent_id: z.string(),
   skill_id: z.string(),
   order: z.number().int(),
+  enabled: z.boolean(),
 });
 export type AgentSkillLink = z.infer<typeof AgentSkillLink>;
 

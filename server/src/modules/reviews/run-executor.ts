@@ -184,6 +184,10 @@ export class ReviewRunExecutor {
 
       const task = taskLine(pull) + rankNote;
 
+      // Linked skills — enabled links only, ordered. assemblePrompt omits the
+      // section when the array is empty.
+      const skillBodies = await this.buildSkillBodies(agent.id, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -201,6 +205,8 @@ export class ReviewRunExecutor {
         ...(callersDigest ? { callers: callersDigest } : {}),
         // T3 — repo skeleton, same omit-when-empty contract.
         ...(repoMap ? { repoMap } : {}),
+        // Linked-skills-in-prompt: enabled links' bodies, same omit-when-empty contract.
+        ...(skillBodies.length > 0 ? { skills: skillBodies } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -401,6 +407,26 @@ export class ReviewRunExecutor {
       return `\n\n${hot.length} of ${changedFiles.length} changed file(s) are in the top 5% most-depended-on (high blast risk) — prioritise their correctness.`;
     } catch {
       return '';
+    }
+  }
+
+  /**
+   * Linked-skills-in-prompt. Loads the agent's linked skills (ordered), keeps
+   * only links AND skills that are both enabled, and returns their bodies in
+   * order. Best-effort like the other enrichment helpers: any failure degrades
+   * to no skills rather than failing the run.
+   */
+  private async buildSkillBodies(agentId: string, runLog: RunLogger): Promise<string[]> {
+    try {
+      const links = await this.agents.linkedSkills(agentId); // already ordered by `order` ascending
+      const active = links.filter((l) => l.enabled && l.skill.enabled);
+      if (active.length === 0) return [];
+      runLog.info(`Loaded ${active.length} skill(s): ${active.map((l) => l.skill.name).join(', ')}`);
+      const skippedCount = links.length - active.length;
+      if (skippedCount > 0) runLog.info(`Skipped ${skippedCount} disabled skill(s)`);
+      return active.map((l) => l.skill.body);
+    } catch {
+      return [];
     }
   }
 

@@ -91,7 +91,16 @@
     "title": "Skills",
     "enabledCount": "{linked} of {total} enabled",
     "filterPlaceholder": "Filter skills…",
-    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach."
+    "orderHint": "Order matters — earlier skills appear earlier in the assembled prompt. Toggle to attach.",
+    "attachLabel": "Attach {name} to this agent",
+    "save": "Save skills",
+    "saving": "Saving…",
+    "saved": "Skills saved",
+    "savedToast": "Skills saved",
+    "moveUp": "Move {name} up",
+    "moveDown": "Move {name} down",
+    "emptyCatalog": "No skills yet. Create one on the Skills page.",
+    "goToSkills": "Go to Skills"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."

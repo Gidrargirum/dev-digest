@@ -21,5 +21,5 @@ continuous capture.
 Naming: `YYYY-MM-topic.md`. Each entry answers three questions: what was
 measured or broken · what we found · what changed as a result.
 
-Once a finding becomes a **rule**, it moves into the relevant `CLAUDE.md` and
+Once a finding becomes a **rule**, it moves into the relevant `AGENTS.md` and
 only its justification stays here.

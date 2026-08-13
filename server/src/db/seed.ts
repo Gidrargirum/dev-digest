@@ -7,6 +7,12 @@ import {
   SECURITY_REVIEWER_PROMPT,
   PERFORMANCE_REVIEWER_PROMPT,
 } from './seed-prompts.js';
+import {
+  SEED_SKILLS,
+  SEED_COMMUNITY_SKILLS,
+  TEST_QUALITY_REVIEWER_PROMPT,
+  API_CONTRACT_REVIEWER_PROMPT,
+} from './seed-skills.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -211,6 +217,28 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       version: 1,
       createdBy: userId,
     },
+    {
+      workspaceId,
+      name: 'Test Quality Reviewer',
+      description: 'Flags untested branches, missing edge cases, and flaky test patterns.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: TEST_QUALITY_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
+    {
+      workspaceId,
+      name: 'API Contract Reviewer',
+      description: 'Flags breaking changes to route signatures, request/response shapes, and status codes.',
+      provider: DEFAULT_PROVIDER,
+      model: DEFAULT_MODEL,
+      systemPrompt: API_CONTRACT_REVIEWER_PROMPT,
+      enabled: true,
+      version: 1,
+      createdBy: userId,
+    },
   ];
   for (const a of seedAgents) {
     const [existing] = await db
@@ -218,6 +246,84 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
     if (!existing) await db.insert(t.agents).values(a);
+  }
+
+  // ---- community skills catalog (global, no workspace scope) ----
+  // Left unimported into the workspace `skills` table on purpose so a student
+  // can walk through the "import from community" flow manually.
+  for (const cs of SEED_COMMUNITY_SKILLS) {
+    const [existing] = await db
+      .select()
+      .from(t.communitySkills)
+      .where(eq(t.communitySkills.name, cs.name));
+    if (!existing) {
+      await db.insert(t.communitySkills).values({
+        name: cs.name,
+        repo: cs.repo,
+        stars: cs.stars,
+        lang: cs.lang,
+        description: cs.description,
+        type: cs.type,
+        body: cs.body,
+      });
+    }
+  }
+
+  // ---- workspace skills (Skills Lab demo data) ----
+  // Body strings live in ./seed-skills.ts. Mirrors AgentsRepository.insert's
+  // version-snapshot pattern: insert the skill row, then snapshot version 1
+  // into skill_versions.
+  for (const def of SEED_SKILLS) {
+    const [existing] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, def.name)));
+    if (!existing) {
+      const [inserted] = await db
+        .insert(t.skills)
+        .values({
+          workspaceId,
+          name: def.name,
+          description: def.description,
+          type: def.type,
+          source: def.source,
+          body: def.body,
+          enabled: def.enabled,
+          version: 1,
+        })
+        .returning();
+      await db.insert(t.skillVersions).values({
+        skillId: inserted!.id,
+        version: 1,
+        body: def.body,
+      });
+    }
+  }
+
+  // ---- agent <-> skill links (Test Quality + API Contract come pre-wired) ----
+  // Skills are opt-in; General/Security/Performance stay without links so a
+  // student sees at least one agent demonstrating prompt assembly with skills.
+  const agentSkillLinks: Array<{ agentName: string; skillName: string; order: number }> = [
+    { agentName: 'Test Quality Reviewer', skillName: 'test-quality-rubric', order: 0 },
+    { agentName: 'Test Quality Reviewer', skillName: 'pr-quality-rubric', order: 1 },
+    { agentName: 'API Contract Reviewer', skillName: 'api-contract-breaking-change', order: 0 },
+    { agentName: 'API Contract Reviewer', skillName: 'pr-quality-rubric', order: 1 },
+  ];
+  for (const link of agentSkillLinks) {
+    const [agent] = await db
+      .select()
+      .from(t.agents)
+      .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, link.agentName)));
+    const [skill] = await db
+      .select()
+      .from(t.skills)
+      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, link.skillName)));
+    if (agent && skill) {
+      await db
+        .insert(t.agentSkills)
+        .values({ agentId: agent.id, skillId: skill.id, order: link.order, enabled: true })
+        .onConflictDoNothing();
+    }
   }
 
   return { workspaceId, userId };

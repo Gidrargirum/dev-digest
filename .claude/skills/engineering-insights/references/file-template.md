@@ -15,7 +15,7 @@ placeholder text — an empty `##` heading is the correct empty state.
 # <package> — engineering insights
 
 Append-only. Newest entries at the bottom of each section.
-Maintained by the `engineering-insights` skill; see ../CLAUDE.md for layer rules.
+Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules.
 
 ## What Works
 

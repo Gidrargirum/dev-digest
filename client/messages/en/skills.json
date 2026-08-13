@@ -7,6 +7,7 @@
     "searchPlaceholder": "Search skills…",
     "loadError": "Could not load skills.",
     "menu": {
+      "fromScratch": "Create from scratch",
       "fromFile": "Import from file",
       "fromUrl": "Import from URL",
       "community": "Search community skills…"
@@ -28,7 +29,46 @@
     "notFound": {
       "title": "Skill not found",
       "body": "It may have been deleted."
+    },
+    "tabs": {
+      "config": "Config",
+      "preview": "Preview",
+      "stats": "Stats",
+      "versions": "Versions"
     }
+  },
+  "config": {
+    "title": "Config",
+    "name": "Name",
+    "description": "Description",
+    "descriptionHint": "The description is the skill's interface — write it directively.",
+    "type": "Type",
+    "enabled": "Enabled",
+    "tokenEstimate": "~{count} tokens",
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "Saved (v{version})"
+  },
+  "stats": {
+    "usedBy": "Used by",
+    "usedByCount": "{count} agents",
+    "acceptRate": "Accept rate",
+    "findings30d": "Findings (30d)",
+    "notUsed": "Not used by any agent yet.",
+    "agentsUsing": "Agents using this skill",
+    "findingsByCategory": "Findings by category",
+    "noCategories": "No findings recorded yet."
+  },
+  "versions": {
+    "heading": "Version history",
+    "explainer": "Every save snapshots the body so evaluations stay reproducible against the exact text they scored.",
+    "current": "Current",
+    "diff": "Diff",
+    "restore": "Restore",
+    "restoring": "Restoring…",
+    "restored": "Restored v{version}",
+    "diffTitle": "v{from} → v{to}",
+    "empty": "No versions yet."
   },
   "drawer": {
     "title": "Add a skill",
@@ -49,7 +89,11 @@
     "bodyPlaceholder": "# Rule\nDescribe the rule…",
     "importing": "Importing…",
     "import": "Import skill",
-    "success": "Imported \"{name}\" (stored as untrusted data)."
+    "success": "Imported \"{name}\" (stored as untrusted data).",
+    "choose": "Choose a file",
+    "dropzone": "Click to browse a .md or .zip file",
+    "preview": "Preview",
+    "ignoredFiles": "Not imported (never executed): {files}"
   },
   "url": {
     "label": "Skill URL",

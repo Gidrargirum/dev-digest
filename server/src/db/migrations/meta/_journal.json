@@ -78,6 +78,13 @@
       "when": 1785696724975,
       "tag": "0010_calm_scourge",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786622370368,
+      "tag": "0011_curious_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

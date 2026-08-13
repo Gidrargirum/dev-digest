@@ -23,3 +23,9 @@ test-results/
 
 # emdash worktree config (local)
 .emdash.json
+
+# pr-self-review run state: receipt, findings.json, pr-body.md. Per-clone and
+# per-branch — and it MUST be ignored, not merely untracked: the receipt's
+# staleness hash covers the untracked file set, so a tracked receipt would
+# invalidate itself the moment it was written.
+.claude/pr-self-review/
