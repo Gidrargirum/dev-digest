@@ -20,11 +20,20 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Captures durable session learnings into the touched module's `insights/INSIGHTS.md` |
 | [pr-self-review](pr-self-review/SKILL.md) | Shared | The pre-PR gate: routes the diff onto these skills, runs the gates, blocks the merge on a critical finding ([docs](pr-self-review/README.md)) |
+| [api-contract-breaking-change](api-contract-breaking-change/SKILL.md) | Product (DevDigest agent) | Route path/method, required params, request shape, status codes/enums — public API breaking changes |
+| [api-contract-response-schema](api-contract-response-schema/SKILL.md) | Product (DevDigest agent) | Response body shape — field removal/rename, type changes, nullability, pagination/error envelopes |
+| [api-contract-semver-discipline](api-contract-semver-discipline/SKILL.md) | Product (DevDigest agent) | Whether a breaking change carries the version bump semver requires |
+| [api-contract-deprecation-policy](api-contract-deprecation-policy/SKILL.md) | Product (DevDigest agent) | Whether a removed/changed public element went through a proper deprecation cycle first |
 
 `pr-self-review` consumes every other row: it decides which of them a given diff
 has earned. A new skill needs a rule in
 [pr-self-review/routing.md](pr-self-review/routing.md), or it will never run on
-a PR — the skill's own preflight reports it if you forget.
+a PR — the skill's own preflight reports it if you forget. The four
+`api-contract-*` rows are the exception: they are not repo-diff-review skills.
+They're portable rubric drafts whose body is meant to be copy-pasted into
+DevDigest's own Skills Lab → Add Skill form and attached to a DevDigest agent
+through DevDigest's UI, so they intentionally have no `pr-self-review` routing
+rule.
 
 ## What Are Skills?
 

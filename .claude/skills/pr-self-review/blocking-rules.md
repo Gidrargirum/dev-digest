@@ -64,6 +64,21 @@ It silently joins the unit lane, which runs without Docker in CI, and breaks it.
 - `server/clones/**` — runtime data.
 - `**/test-results/**`, `dist/**` — artifacts.
 
+**One carve-out — the `NAV` and `SHORTCUTS` arrays in
+`client/src/vendor/ui/nav.ts`.** Adding or editing an entry in those two arrays
+is not B6. Touching anything else in that file — the `NavItemDef`/`NavGroup`
+interfaces, `resolveHref`, `SETTINGS_ITEM`, `SETTINGS_SECTIONS` — still is, so
+check the *scope* of the diff rather than matching the path.
+
+> Why: they are a registry the app is meant to extend, not a component to bend.
+> `vendor/ui/shell/Sidebar.tsx` imports `NAV` directly and exposes no prop to
+> inject items, so a new screen is unreachable from the sidebar without an entry
+> here — the rule was firing on the only possible implementation, which is a bug
+> in the rule. `6b9b35d` added the whole SKILLS LAB section this way. Note also
+> that nothing re-syncs `vendor/ui` (there is no counterpart to
+> `scripts/sync-shared.mjs`), so the usual "an upstream refresh clobbers your
+> edit" cost of touching vendored code does not apply to this file.
+>
 > Source: `client/AGENTS.md`, `server/AGENTS.md`, root `AGENTS.md` "Do not touch".
 
 ### B7 — the domain stopped being pure

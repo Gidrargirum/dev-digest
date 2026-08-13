@@ -13,7 +13,7 @@ file routinely lands in several slices. A `repository.ts` is both
 | `client/src/app/**/_components/**`, `client/src/components/**` | client-ui | `frontend-architecture`, `react-best-practices` |
 | `client/src/lib/hooks/**`, `client/src/lib/api.ts` | client-ui | `frontend-architecture`, `react-best-practices` |
 | `client/**/*.test.tsx`, `client/**/*.test.ts` | tests | `react-testing-library` |
-| `client/src/vendor/ui/**` | forbidden | — → rule **B6** on sight |
+| `client/src/vendor/ui/**` | forbidden | — → rule **B6** on sight, except a `NAV`/`SHORTCUTS` entry in `nav.ts` (see B6's carve-out) |
 | `server/src/modules/**/routes.ts`, `server/src/app.ts`, `server/src/plugins/**` | server-backend | `onion-architecture`, `fastify-best-practices` |
 | `server/src/modules/**/service.ts` | server-backend | `onion-architecture` |
 | `server/src/modules/**/repository*.ts` | server-backend, db | `onion-architecture`, `drizzle-orm-patterns` |
