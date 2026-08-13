@@ -11,6 +11,16 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for the session
 
 - **2026-08-02** — A field added to `PrMeta` (`server/src/vendor/shared/contracts/platform.ts` + client copy) that's populated by only one endpoint must be `.nullish()`, not `.nullable()`. `PrMeta` is also built by the GitHub import adapter (`server/src/adapters/github/octokit.ts`), test mocks (`server/src/adapters/mocks.ts`), and the PR-detail route — none of these set list-only fields like `score` or `cost_usd`, so `.nullable()` fails `pnpm typecheck` in all three.
 
+- **2026-08-13** — Adding a screen to the sidebar **requires** editing
+  `client/src/vendor/ui/nav.ts`, which `pr-self-review` rule B6 marks
+  do-not-touch on sight. There is no legal alternative: `vendor/ui/shell/Sidebar.tsx`
+  imports `NAV` directly and exposes no prop to inject items, and the precedent
+  commit `6b9b35d` added the whole SKILLS LAB section the same way. So B6 as
+  written fires on the only possible implementation. Expect the conflict on every
+  new screen; the fix belongs in `.claude/skills/pr-self-review/blocking-rules.md`
+  (carve out the `NAV`/`SHORTCUTS` arrays, keep the rest of `nav.ts` blocking),
+  not in a per-PR `--override`.
+
 ## Tool & Library Notes
 
 - **2026-08-12** — Claude Code (checked on v2.1.228) loads `CLAUDE.md` only; it never looks for `AGENTS.md`. The two bridges its docs sanction are a `@AGENTS.md` import inside `CLAUDE.md` and a symlink. This repo picked the symlink (`git mv CLAUDE.md AGENTS.md && ln -s AGENTS.md CLAUDE.md && git add CLAUDE.md` per package dir) because the import form collides with the repo-wide "No `@import` in any `AGENTS.md`" rule. Verify with `git ls-files -s | grep 120000` — five entries; if a `CLAUDE.md` shows up as mode `100644` someone replaced the link with a copy and the two files will silently drift.

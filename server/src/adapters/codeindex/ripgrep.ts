@@ -57,7 +57,20 @@ export class RipgrepCodeIndex implements CodeIndex {
   private grepWithRg(rg: string, root: string, pattern: string): Promise<CodeMatch[]> {
     return new Promise((resolve, reject) => {
       const matches: CodeMatch[] = [];
-      const proc = spawn(rg, ['--line-number', '--no-heading', '--color=never', pattern, root]);
+      // `--` before the positional args is load-bearing, not cosmetic: ripgrep
+      // accepts flags in ANY argv position, so a pattern beginning with `-`
+      // would be parsed as one. `--pre=<cmd>` in particular makes rg execute
+      // that command per file — and callers now pass model-authored patterns
+      // (conventions extraction), which originate from untrusted repo text.
+      // `spawn` without a shell stops metacharacters; only `--` stops this.
+      const proc = spawn(rg, [
+        '--line-number',
+        '--no-heading',
+        '--color=never',
+        '--',
+        pattern,
+        root,
+      ]);
       let buf = '';
       proc.stdout.on('data', (d) => {
         buf += d.toString();

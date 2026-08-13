@@ -68,8 +68,35 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   src/server.ts` — the committed `start` is `node dist/server.js`, which is the
   wrong entrypoint for a dev-mode API regardless of any git flag. Fix the
   rationale, keep the commands.
+- **2026-08-13** — `pnpm db:generate` turns **interactive** when one table gains
+  and loses columns in the same generation: drizzle-kit cannot tell an add from a
+  rename and prompts `Is <col> created or renamed from another column?`, which
+  hangs any non-TTY run. Split it into two passes — generate the additions with
+  the doomed column still in the schema file, then delete it and generate again.
+  Two migrations, zero prompts, and neither file is hand-edited (hand-editing a
+  generated migration is itself a review finding).
+- **2026-08-13** — `MockGitClient.readFile` returns `''` for an unknown path
+  instead of throwing (`src/adapters/mocks.ts`). Code that distinguishes "file
+  absent" from "file present but empty" via try/catch therefore takes the wrong
+  branch under test while behaving correctly against `SimpleGitClient`, which
+  does throw `ENOENT`. Treat empty content as absent at the call site rather than
+  relying on the throw.
+- **2026-08-13** — `RipgrepCodeIndex.grep` passes the pattern positionally, and
+  ripgrep parses flags in **any** argv position: a pattern of `--pre=<cmd>` makes
+  rg execute that command once per scanned file. `spawn` without `shell: true`
+  stops shell metacharacters, not flag smuggling — the separator `--` before the
+  positionals is what stops it (added 2026-08-13). Any adapter that forwards a
+  caller-supplied string as a positional argument needs the same treatment, and
+  callers passing model-authored patterns should reject a leading `-` as well.
 
 ## Recurring Errors & Fixes
+
+- **2026-08-13** — An integration test that injects `ContainerOverrides.repoIntel`
+  must stub `registerIndexJobHandlers` as a no-op, not just the methods under
+  test. `modules/repo-intel/routes.ts` calls it at plugin load, so a partial stub
+  fails every route in the app with `container.repoIntel.registerIndexJobHandlers
+  is not a function` at `buildApp` time — the failure names repo-intel and points
+  at boot, which reads like an app bug rather than a test-double gap.
 
 ## Session Notes
 

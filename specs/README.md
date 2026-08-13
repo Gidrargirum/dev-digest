@@ -7,6 +7,7 @@ for features touching more than one package. Normative voice — "must",
 | Specification | About |
 |---|---|
 | [findings-severity-breakdown.md](./findings-severity-breakdown.md) | FINDINGS counters + hover popover on the PR list and the Agent runs timeline |
+| [conventions-extractor.md](./conventions-extractor.md) | Extracting house conventions from a repo and merging the accepted ones into a skill |
 
 ## What belongs here
 

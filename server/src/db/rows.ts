@@ -18,3 +18,5 @@ export type SkillRow = typeof t.skills.$inferSelect;
 export type SkillVersionRow = typeof t.skillVersions.$inferSelect;
 export type CommunitySkillRow = typeof t.communitySkills.$inferSelect;
 export type ReviewRow = typeof t.reviews.$inferSelect;
+export type ConventionRow = typeof t.conventions.$inferSelect;
+export type ConventionScanRow = typeof t.conventionScans.$inferSelect;
