@@ -63,6 +63,11 @@ Each package has its own README with deeper diagrams:
 [`reviewer-core`](reviewer-core/README.md) (review pipeline) ·
 [`e2e`](e2e/README.md).
 
+Agent instructions live in `AGENTS.md` (root + one per package); the `CLAUDE.md`
+next to each is a symlink, because Claude Code reads only `CLAUDE.md`. On Windows
+those symlinks need `git config --global core.symlinks true` plus Developer Mode —
+otherwise git checks them out as text files containing the word `AGENTS.md`.
+
 ## What works on day 1
 
 - **Local launch** — one command brings up Postgres (Docker) + API + web.

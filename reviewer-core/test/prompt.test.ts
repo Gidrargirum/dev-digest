@@ -64,3 +64,31 @@ describe('assemblePrompt — ## PR description', () => {
     expect((assembly.pr_description as string).length).toBe(4000);
   });
 });
+
+describe('assemblePrompt — ## Skills / rules', () => {
+  it('renders linked skill bodies, joined and NOT untrusted-wrapped, before memory', () => {
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      skills: ['# Rule one\nDo X.', '# Rule two\nDo Y.'],
+      memory: ['remember this'],
+    });
+    const user = messages[1]!.content;
+    expect(user).toContain('## Skills / rules');
+    expect(user).toContain('# Rule one\nDo X.');
+    expect(user).toContain('# Rule two\nDo Y.');
+    // Skills are trusted instructions (linked by the workspace owner), unlike
+    // diff/specs/pr-description — they are NOT wrapped in <untrusted> delimiters.
+    expect(user).not.toContain('<untrusted source="skills"');
+    expect(user.indexOf('## Skills / rules')).toBeLessThan(user.indexOf('## Relevant memory'));
+    expect(user.indexOf('## Skills / rules')).toBeLessThan(user.indexOf('## Diff to review'));
+    expect(assembly.skills).toBe('# Rule one\nDo X.\n\n# Rule two\nDo Y.');
+  });
+
+  it('omits the section when skills is undefined or an empty array (no behaviour change)', () => {
+    expect(userOf({ system: 'sys', diff: 'DIFF' })).not.toContain('## Skills / rules');
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF' }).assembly.skills ?? null).toBeNull();
+    expect(userOf({ system: 'sys', diff: 'DIFF', skills: [] })).not.toContain('## Skills / rules');
+    expect(assemblePrompt({ system: 'sys', diff: 'DIFF', skills: [] }).assembly.skills ?? null).toBeNull();
+  });
+});

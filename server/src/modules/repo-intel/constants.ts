@@ -10,8 +10,11 @@ export const REFRESH_JOB_KIND = 'repo-intel-refresh';
 export const RESYNC_JOB_KIND = 'repo-intel-resync';
 
 // --- Walk / parse scope -----------------------------------------------------
-/** [T1] Files we parse (diff-scoped in T1; whole walk in T2). */
-export const SUPPORTED_EXT = ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'] as const;
+// SUPPORTED_EXT and MAX_SIGNATURE_CHARS are shared with the astgrep/depgraph
+// adapters, so they live in platform (an adapter importing a module would point
+// a dependency outward-in). Re-exported here so this module's own imports are
+// unchanged.
+export { SUPPORTED_EXT, MAX_SIGNATURE_CHARS } from '../../platform/source-scope.js';
 
 /** [T1] Directories never walked. `.gitignore` is layered on top in T2 walk. */
 export const EXCLUDED_DIRS = [
@@ -49,5 +52,3 @@ export const INDEX_SOFT_BUDGET_MS = 110_000;
 export const BFS_DEPTH = 2;
 export const HOTNESS_WINDOW_DAYS = 180;
 export const DEFAULT_REPO_MAP_TOKEN_BUDGET = 1500;
-/** Signatures are trimmed to this many chars in the parse phase (cache stability). */
-export const MAX_SIGNATURE_CHARS = 120;

@@ -31,6 +31,7 @@ If a test wouldn't catch a class of regression we care about, we don't write it.
 | server-integration | `server/` | integration (real Postgres) | vitest | `server-integration.yml` | **yes** |
 | reviewer-core | `reviewer-core/` | unit (engine) | vitest | `reviewer-core.yml` | no |
 | e2e web | `e2e/` | browser e2e (deterministic) | agent-browser + `run.ts` | `e2e-web.yml` | yes (stack) |
+| guards | — | repo invariants (vendored-copy drift, skills-lock) | plain Node scripts | `guards.yml` | no |
 
 ## What each suite covers
 
@@ -39,9 +40,10 @@ If a test wouldn't catch a class of regression we care about, we don't write it.
 surface (list, diff, findings, run controls) and the agent editor.
 
 **server-unit** — the DB-free majority: adapters, prompt assembly, grounding,
-repo-intel ranking & indexing, pricing, route smoke. The `typecheck` job also
-runs on Windows, which doubles as the `@ast-grep/napi` prebuilt gate (install
-fails there if the win32 prebuilt is missing).
+repo-intel ranking & indexing, pricing, route smoke. The `typecheck` job runs on
+Linux only — deliberately not matrixed over Windows/macOS (see the header of
+`server-unit.yml` for why) — and also runs `arch:check` + `arch:ratchet`, since
+the Onion boundary gate needs no Docker, DB or keys.
 
 **server-integration** — the `*.it.test.ts` files. Each starts a real Postgres
 (pgvector) via testcontainers, builds the Fastify app, migrates + seeds, and
@@ -56,6 +58,11 @@ and a `run` with a stubbed model → grounded findings. No DB / GitHub / FS.
 main journeys (boot → PR list → PR detail; agents) against a real seeded stack.
 No `chat`, no model key.
 
+**guards** — invariants that belong to no package. `sync-shared.mjs --check`
+fails when the two vendored `@devdigest/shared` copies drift (each side
+type-checks fine alone, so nothing else catches it); `check-skills-lock.mjs`
+fails when `skills-lock.json` pins a skill that is not on disk.
+
 ## Running locally
 
 ```sh
@@ -67,6 +74,11 @@ cd reviewer-core && npm test
 cd server && pnpm exec vitest run --exclude '**/*.it.test.ts'   # unit, no Docker
 cd server && pnpm exec vitest run .it.test                      # integration, needs Docker
 cd server && pnpm test                                          # both
+cd server && pnpm arch:check && pnpm arch:ratchet               # Onion boundaries
+
+# repo-wide guards (no install needed)
+node scripts/sync-shared.mjs --check
+node scripts/check-skills-lock.mjs
 
 # browser e2e (needs the full stack + agent-browser CLI)
 ./scripts/dev.sh
@@ -80,10 +92,10 @@ cd e2e && npm install && npm test
   (`vitest run --exclude '**/*.it.test.ts'`); the integration lane selects only
   it (`vitest run .it.test`). A DB-backed test that imports `test/helpers/pg.ts`
   must use the `.it.test.ts` suffix.
-- **`server/package.json` is `skip-worktree`** (a local variant diverges from the
-  committed file). CI therefore invokes the split with
-  `pnpm exec vitest run …` rather than relying on committed `test:unit` /
-  `test:integration` scripts.
+- **The lane split lives in the command, not in a script.** `test:unit` /
+  `test:integration` have never existed in `server/package.json`, so CI and humans
+  both invoke `pnpm exec vitest run …` directly. Don't add those scripts without
+  updating the three server workflows that inline the commands.
 - **Hermetic by default.** Reach for `src/adapters/mocks.ts` (MockLLMProvider,
   MockGitClient) rather than real network/keys.
 - **E2E specs are deterministic batch JSON** (`e2e/specs/*.flow.json`) using

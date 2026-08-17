@@ -2,6 +2,21 @@ import { pgTable, uuid, text, integer, boolean, jsonb, primaryKey } from 'drizzl
 import { now } from './_shared';
 import { workspaces } from './core';
 
+/**
+ * Global catalog of importable community skills (seeded, no workspace scope —
+ * a shared read-only lookup table for the "Search community skills" panel).
+ */
+export const communitySkills = pgTable('community_skills', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull(),
+  repo: text('repo').notNull(),
+  stars: integer('stars').notNull().default(0),
+  lang: text('lang').notNull(),
+  description: text('description').notNull(),
+  type: text('type', { enum: ['rubric', 'convention', 'security', 'custom'] }).notNull(),
+  body: text('body').notNull(),
+});
+
 export const skills = pgTable('skills', {
   id: uuid('id').primaryKey().defaultRandom(),
   workspaceId: uuid('workspace_id')

@@ -1,7 +1,7 @@
 # docs/ — how it works (cross-package)
 
 Explanatory guides for mechanisms that span package boundaries. One file per
-mechanism. Not rules (those live in `CLAUDE.md`) and not requirements (those
+mechanism. Not rules (those live in `AGENTS.md`) and not requirements (those
 live in `specs/`).
 
 | Document | About |

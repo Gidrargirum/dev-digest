@@ -46,4 +46,8 @@ jobs:
 
       - run: pnpm typecheck
 
+      # --max-warnings 0: the tree was at zero when the rules landed, so there is
+      # no suppression baseline here. Fix the finding rather than raising a cap.
+      - run: pnpm lint
+
       - run: pnpm test

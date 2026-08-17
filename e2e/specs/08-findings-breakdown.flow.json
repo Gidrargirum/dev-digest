@@ -1,13 +1,64 @@
 {
   "name": "PR list FINDINGS column shows severity counters and opens the findings popover",
-  "description": "On the PR list, the seeded PR #482 (one review with one CRITICAL and one WARNING finding) must render a FINDINGS column between SCORE and STATUS. Opening its popover lists the findings themselves. The trigger is toggled by click rather than hover so the flow stays deterministic (the HoverCard opens on both). Read-only seeded data (no model call). Assumes the freshly-seeded hermetic stack — see e2e/README.md.",
+  "description": "On the PR list, the seeded PR #482 (one review with one CRITICAL and one WARNING finding) must render a FINDINGS column between SCORE and STATUS. Hovering its trigger lists the findings themselves. The trigger is opened by HOVER, not click: it opens on onMouseEnter/onFocus and its onClick TOGGLES, so a click arriving after the driver has already focused the element closes the popover again. The header assertion matches FINDINGS in caps \u2014 the i18n string is \"Findings\" but the header row is text-transform: uppercase and the driver matches rendered text. Read-only seeded data (no model call). Assumes the freshly-seeded hermetic stack \u2014 see e2e/README.md.",
   "steps": [
-    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
-    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
-    { "cmd": ["wait", "--load", "networkidle"], "label": "PR list data settles" },
-    { "cmd": ["wait", "--text", "Findings"], "label": "the FINDINGS column header is present" },
-    { "cmd": ["find", "role", "button", "click", "--name", "Show findings"], "label": "open the findings popover of the first PR with findings" },
-    { "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"], "label": "the popover lists the seeded CRITICAL finding" },
-    { "cmd": ["wait", "--text", "N+1 query in user list endpoint"], "label": "the popover lists the seeded WARNING finding" }
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "land on the PR list"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "PR list data settles"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "FINDINGS"
+      ],
+      "label": "the FINDINGS column header is present"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "hover",
+        "--name",
+        "Show findings"
+      ],
+      "label": "hover the findings trigger of the first PR with findings"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Hardcoded Stripe secret key in commit"
+      ],
+      "label": "the popover lists the seeded CRITICAL finding"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "N+1 query in user list endpoint"
+      ],
+      "label": "the popover lists the seeded WARNING finding"
+    }
   ]
 }

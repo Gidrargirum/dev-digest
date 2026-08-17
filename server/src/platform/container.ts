@@ -25,8 +25,10 @@ import { PriceBook } from './price-book.js';
 import { ConfigError } from './errors.js';
 import { AgentsRepository } from '../modules/agents/repository.js';
 import { ReviewRepository } from '../modules/reviews/repository.js';
+import { SkillsRepository } from '../modules/skills/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
+import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 
@@ -72,6 +74,7 @@ export class Container {
   // `container.agentsRepo` instead of reaching into another module's folder.
   private _agentsRepo?: AgentsRepository;
   private _reviewRepo?: ReviewRepository;
+  private _skillsRepo?: SkillsRepository;
   private _repoIntel?: RepoIntel;
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
@@ -100,6 +103,10 @@ export class Container {
     return (this._reviewRepo ??= new ReviewRepository(this.db));
   }
 
+  get skillsRepo(): SkillsRepository {
+    return (this._skillsRepo ??= new SkillsRepository(this.db));
+  }
+
   get codeIndex(): CodeIndex {
     if (this.overrides.codeIndex) return this.overrides.codeIndex;
     this._codeIndex ??= new RipgrepCodeIndex(this.git);
@@ -113,7 +120,17 @@ export class Container {
    */
   get repoIntel(): RepoIntel {
     if (this.overrides.repoIntel) return this.overrides.repoIntel;
-    this._repoIntel ??= new RepoIntelService(this);
+    this._repoIntel ??= new RepoIntelService(
+      {
+        config: this.config,
+        git: this.git,
+        codeIndex: this.codeIndex,
+        depgraph: this.depgraph,
+        tokenizer: this.tokenizer,
+        jobs: this.jobs,
+      },
+      new RepoIntelRepository(this.db),
+    );
     return this._repoIntel;
   }
 

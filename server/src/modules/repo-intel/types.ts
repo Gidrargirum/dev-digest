@@ -21,6 +21,10 @@
  * This keeps signatures natural (no `{ degraded, data }` wrappers at call sites)
  * while still guaranteeing every consumer can fall back without throwing.
  */
+import type { GitClient, CodeIndex } from '@devdigest/shared';
+import type { DepGraph, Tokenizer } from '../../ports/index.js';
+import type { AppConfig } from '../../platform/config.js';
+import type { JobRunner } from '../../platform/jobs.js';
 
 export type IndexStatus = 'full' | 'partial' | 'degraded' | 'failed';
 
@@ -134,7 +138,33 @@ export interface RepoMapResult {
  * CI may parse diff-scoped on the hot path. Indexing runs through
  * JobRunner handlers in studio, inline in the CI runner.
  */
+/**
+ * What RepoIntelService needs from the outside world — stated as ports, not as
+ * the container.
+ *
+ * Taking `Container` here used to point the application ring at the composition
+ * root, and since the container also *constructs* RepoIntelService, that closed
+ * a cycle (container → service → container) that dependency-cruiser reported
+ * four times over. Listing the ports breaks it and makes the dependencies
+ * visible in the signature.
+ */
+export interface RepoIntelDeps {
+  readonly config: AppConfig;
+  readonly git: GitClient;
+  readonly codeIndex: CodeIndex;
+  readonly depgraph: DepGraph;
+  readonly tokenizer: Tokenizer;
+  readonly jobs: JobRunner;
+}
+
 export interface RepoIntel {
+  // --- Lifecycle ----------------------------------------------------------
+  /**
+   * Bind the INDEX/REFRESH/RESYNC job kinds to this facade. Called once during
+   * route registration; the JobRunner keeps the closure, not the instance.
+   */
+  registerIndexJobHandlers(): void;
+
   // --- Indexing -----------------------------------------------------------
   /** Full (re)index of a repo. */
   indexRepo(repoId: string): Promise<IndexResult>;

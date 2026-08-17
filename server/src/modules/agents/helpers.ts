@@ -1,6 +1,9 @@
 import type { Agent, AgentVersion, CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { AgentVersionConfig } from '@devdigest/shared';
-import type { AgentRow, AgentVersionRow } from './repository.js';
+// Row shapes come from db/rows.ts, not from repository.ts: the repository
+// imports isConfigChange from here, so pointing back at it closed a cycle.
+// rows.ts exists for exactly this — see its header.
+import type { AgentRow, AgentVersionRow } from '../../db/rows.js';
 
 /**
  * Pure helpers for the agents module — DB row ⇄ DTO mapping and the

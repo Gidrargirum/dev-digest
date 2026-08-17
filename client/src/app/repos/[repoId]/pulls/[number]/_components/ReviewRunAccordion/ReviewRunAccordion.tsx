@@ -11,7 +11,7 @@ import type { ReviewRecord, RunSummary, Verdict } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { RunCostBadge } from "@/components/run-cost-badge";
-import { useDeleteReview } from "../../../../../../../lib/hooks/reviews";
+import { useDeleteReview } from "@/lib/hooks/reviews";
 
 const VERDICT_COLOR: Record<string, string> = {
   request_changes: "var(--crit)",
@@ -54,7 +54,8 @@ export function ReviewRunAccordion({
       setOpen(true);
       rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // targetNonce is an intentional extra dep: it re-fires the scroll when the
+    // same run is targeted twice in a row. See FindingsTab.
   }, [targetRunId, targetNonce, review.run_id]);
   const del = useDeleteReview(prId);
   const findings = review.findings;

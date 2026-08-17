@@ -1,0 +1,62 @@
+# Repo-wide guards: cheap invariants that no package's own suite can check.
+#
+# Both jobs are plain Node with no install step, so this workflow costs seconds.
+#
+#  - contracts:   @devdigest/shared exists as TWO vendored copies —
+#                 server/src/vendor/shared (canonical; reviewer-core's tsconfig
+#                 resolves the alias to it) and client/src/vendor/shared (mirror).
+#                 There is no workspace to link them, so nothing but this job
+#                 stops them drifting, and drift is silent: each side
+#                 type-checks fine on its own.
+#  - skills-lock: every skill pinned in skills-lock.json must exist on disk.
+#                 Two entries once outlived the folders they pinned.
+name: guards
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - '.claude/skills/**'
+      - 'skills-lock.json'
+      - 'scripts/sync-shared.mjs'
+      - 'scripts/check-skills-lock.mjs'
+      - '.github/workflows/guards.yml'
+  pull_request:
+    paths:
+      - 'server/src/vendor/shared/**'
+      - 'client/src/vendor/shared/**'
+      - '.claude/skills/**'
+      - 'skills-lock.json'
+      - 'scripts/sync-shared.mjs'
+      - 'scripts/check-skills-lock.mjs'
+      - '.github/workflows/guards.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: guards-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contracts:
+    name: vendored contracts in sync
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/sync-shared.mjs --check
+
+  skills-lock:
+    name: skills-lock matches disk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/check-skills-lock.mjs

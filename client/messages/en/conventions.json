@@ -2,25 +2,99 @@
   "page": {
     "crumbLab": "Skills Lab",
     "crumbConventions": "Conventions",
-    "headingPrefix": "Conventions in ",
-    "repoFallback": "repo",
-    "subtitle": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
-    "scanning": "Scanning…",
+    "heading": "Conventions in {repo}",
+    "repoFallback": "this repo",
+    "subtitle": "Detected from {files, plural, one {# sample file} other {# sample files}} · last scan {when}",
+    "subtitleNoScan": "Scan the cloned repo to surface house-rules — each backed by evidence you can turn into a Skill.",
     "rescan": "Re-scan",
-    "runExtraction": "Run extraction",
-    "extractionFailed": "Extraction failed",
+    "scanning": "Scanning…",
+    "scanProgress": "Scan {status} — the list updates as candidates land.",
+    "scanFailed": "The last scan failed: {error}",
+    "scanFailedUnknown": "no error was reported",
     "loadError": "Could not load conventions.",
+    "errorTitle": "Conventions unavailable",
+    "toolbar": {
+      "deselectAll": "Deselect all",
+      "accepted": "{accepted} of {total} accepted",
+      "createSkill": "Create skill"
+    },
     "empty": {
-      "title": "No conventions extracted yet",
+      "title": "No scan yet — run one",
       "body": "Scan the repo to surface house-rules — naming, error handling, structure — each backed by evidence you can turn into a Skill.",
       "cta": "Run extraction"
     },
-    "candidateCount": "{count, plural, one {# candidate} other {# candidates}} · grounded against sampled files"
+    "emptyAfterScan": {
+      "title": "The scan finished without candidates",
+      "body": "Nothing corroborated enough to propose. The repo may not be indexed yet — index it, then re-scan.",
+      "cta": "Re-scan"
+    },
+    "status": {
+      "queued": "queued",
+      "running": "running",
+      "done": "done",
+      "failed": "failed"
+    },
+    "relative": {
+      "justNow": "just now",
+      "minutes": "{count, plural, one {# minute ago} other {# minutes ago}}",
+      "hours": "{count, plural, one {# hour ago} other {# hours ago}}",
+      "days": "{count, plural, one {# day ago} other {# days ago}}",
+      "unknown": "unknown"
+    }
   },
   "card": {
     "confidence": "Confidence",
+    "confidencePct": "{pct}% confidence",
+    "corroboration": "{support, plural, one {# file follows} other {# files follow}} · {violations, plural, one {# violates} other {# violate}}",
+    "evidenceLocation": "Evidence location",
+    "copyLocation": "Copy evidence location",
+    "copied": "Copied",
+    "editRule": "Edit rule",
+    "ruleLabel": "Rule text",
+    "save": "Save",
+    "saving": "Saving…",
+    "saveError": "Could not save the rule. Your text is still here — try again.",
+    "cancel": "Cancel",
     "accepted": "Accepted",
-    "accepting": "Accepting…",
-    "acceptAsSkill": "Accept as Skill"
+    "accept": "Accept",
+    "reject": "Reject",
+    "rejected": "Rejected",
+    "category": {
+      "naming": "naming",
+      "structure": "structure",
+      "error-handling": "error handling",
+      "async": "async",
+      "testing": "testing",
+      "api": "api",
+      "imports": "imports",
+      "security": "security",
+      "other": "other"
+    }
+  },
+  "createSkill": {
+    "title": "Create skill from conventions",
+    "loading": "Assembling the draft…",
+    "banner": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "fields": {
+      "name": "Name",
+      "namePlaceholder": "repo-conventions",
+      "description": "Description",
+      "descriptionPlaceholder": "What this skill teaches the reviewer",
+      "type": "Type",
+      "enabled": "Enabled",
+      "body": "Skill body",
+      "bodyHint": "Markdown injected into the review prompt."
+    },
+    "type": {
+      "rubric": "rubric",
+      "convention": "convention",
+      "security": "security",
+      "custom": "custom"
+    },
+    "tokenEstimate": "≈ {count} tokens",
+    "cancel": "Cancel",
+    "create": "Create skill",
+    "creating": "Creating…",
+    "error": "Could not create the skill. Nothing was saved — try again."
   }
 }

@@ -16,6 +16,7 @@ import { createDb, type Db } from './db/client.js';
 import { Container, type ContainerOverrides } from './platform/container.js';
 import { AppError } from './platform/errors.js';
 import { modules } from './modules/index.js';
+import { ConventionsService } from './modules/conventions/service.js';
 import { ReviewService } from './modules/reviews/service.js';
 
 // Attach the DI container to every request/instance.
@@ -82,6 +83,14 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
     if (reaped > 0) app.log.info({ reaped }, 'reaped stale running agent_runs on boot');
   } catch (err) {
     app.log.warn({ err: (err as Error).message }, 'stale-run reaping failed (non-fatal)');
+  }
+
+  // Same orphan problem, same reasoning, for conventions scans.
+  try {
+    const reaped = await new ConventionsService(container).reapStaleScans();
+    if (reaped > 0) app.log.info({ reaped }, 'reaped stale running convention_scans on boot');
+  } catch (err) {
+    app.log.warn({ err: (err as Error).message }, 'stale-scan reaping failed (non-fatal)');
   }
 
   // Security headers (X-Content-Type-Options, X-Frame-Options, …). The API

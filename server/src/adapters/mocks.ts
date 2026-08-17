@@ -296,8 +296,24 @@ export class MockGitClient implements GitClient {
 }
 
 // ---------- Mock CodeIndex ----------
+export interface MockCodeIndexOptions {
+  /**
+   * Per-pattern hit lists. Used by corroboration flows (conventions) where the
+   * NUMBER of matches is the assertion — a rule's confidence is the ratio of
+   * supporting to violating hits, so the count has to be controllable.
+   */
+  matchesByPattern?: Record<string, CodeMatch[]>;
+  /** Fallback when `matchesByPattern` has no entry for the pattern. */
+  matches?: CodeMatch[];
+}
+
 export class MockCodeIndex implements CodeIndex {
+  constructor(private opts: MockCodeIndexOptions = {}) {}
+
   async grep(_repo: RepoRef, pattern: string): Promise<CodeMatch[]> {
+    const byPattern = this.opts.matchesByPattern?.[pattern];
+    if (byPattern) return byPattern;
+    if (this.opts.matches) return this.opts.matches;
     return [{ path: 'src/config.ts', line: 12, text: `match for ${pattern}` }];
   }
   async symbols(): Promise<CodeSymbol[]> {

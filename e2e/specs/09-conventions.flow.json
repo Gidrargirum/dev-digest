@@ -1,0 +1,42 @@
+{
+  "name": "Conventions screen reaches the never-scanned empty state from the sidebar",
+  "description": "The Conventions screen is reachable from the SKILLS LAB sidebar section and, on a freshly-seeded stack where no extraction has ever run, renders the never-scanned empty state with its Run extraction call to action. The flow deliberately stops before running an extraction: a scan calls a model, and this suite has no keys and must stay deterministic (see e2e/AGENTS.md). What is asserted here is the route, the heading and the empty state — the pipeline itself is covered by server/test/conventions.it.test.ts against a mock provider. Assumes the freshly-seeded hermetic stack — see e2e/README.md.",
+  "steps": [
+    {
+      "cmd": ["open", "{BASE}/"],
+      "label": "load the app root"
+    },
+    {
+      "cmd": ["wait", "--url", "/pulls"],
+      "label": "land on the PR list so the active repo is resolved"
+    },
+    {
+      "cmd": ["wait", "--load", "networkidle"],
+      "label": "PR list data settles"
+    },
+    {
+      "cmd": ["find", "text", "Conventions", "click"],
+      "label": "open Conventions from the SKILLS LAB sidebar section"
+    },
+    {
+      "cmd": ["wait", "--url", "/conventions"],
+      "label": "the conventions route is active"
+    },
+    {
+      "cmd": ["wait", "--load", "networkidle"],
+      "label": "the conventions query settles"
+    },
+    {
+      "cmd": ["wait", "--text", "Conventions in"],
+      "label": "the page heading names the active repo"
+    },
+    {
+      "cmd": ["wait", "--text", "No scan yet"],
+      "label": "the never-scanned empty state is shown"
+    },
+    {
+      "cmd": ["wait", "--text", "Re-scan"],
+      "label": "the Re-scan action is available"
+    }
+  ]
+}

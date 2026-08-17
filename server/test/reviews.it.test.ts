@@ -289,6 +289,61 @@ d('A2 reviews + agents (Testcontainers pg)', () => {
     await app.close();
   });
 
+  it('linked + enabled skills appear as a prompt block in the trace; disabling the link removes it', async () => {
+    const app = await appWith(REVIEW_FIXTURE);
+    const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
+    const agent = (
+      await app.inject({
+        method: 'POST',
+        url: '/agents',
+        payload: { name: 'SkillAgent', provider: 'openai', model: 'gpt-4.1', system_prompt: 's' },
+      })
+    ).json();
+    const skill = (
+      await app.inject({
+        method: 'POST',
+        url: '/skills',
+        payload: {
+          name: 'must-flag-secrets',
+          description: 'Flags hardcoded secrets.',
+          type: 'security',
+          body: '# Secret gate\nFlag any hardcoded API key or secret.',
+        },
+      })
+    ).json();
+    await app.inject({
+      method: 'POST',
+      url: `/agents/${agent.id}/skills`,
+      payload: { skill_ids: [skill.id] },
+    });
+
+    const runA = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json();
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 1 });
+    const traceA = (
+      await app.inject({ method: 'GET', url: `/runs/${runA.runs[0].run_id}/trace` })
+    ).json();
+    expect(traceA.prompt_assembly.skills).toContain('Flag any hardcoded API key or secret.');
+
+    // Disable the link: the block must disappear from the next run's trace.
+    await app.inject({
+      method: 'PATCH',
+      url: `/agents/${agent.id}/skills/${skill.id}`,
+      payload: { enabled: false },
+    });
+    const runB = (
+      await app.inject({ method: 'POST', url: `/pulls/${pr.id}/review`, payload: { agentId: agent.id } })
+    ).json();
+    await waitForPrRuns(pg.handle.db, pr.id, { expected: 2 });
+    const traceB = (
+      await app.inject({ method: 'GET', url: `/runs/${runB.runs[0].run_id}/trace` })
+    ).json();
+    expect(traceB.prompt_assembly.skills ?? null).toBeNull();
+
+    await app.close();
+  });
+
   it('run all enabled agents reviews with each enabled agent', async () => {
     const app = await appWith(REVIEW_FIXTURE);
     const { pr } = await setupRepoAndPr(pg.handle.db, workspaceId);
