@@ -44,6 +44,10 @@ skills are absent from the matrix **on purpose** and must not be reported:
 | `engineering-insights` | authoring skill, runs at end of session — reviews nothing |
 | `mermaid-diagram` | authoring skill for diagrams |
 | `pr-self-review` | this skill |
+| `api-contract-breaking-change` | product content for DevDigest's own Skills Lab, not a repo-diff-review skill — see `.claude/skills/README.md` |
+| `api-contract-response-schema` | same as above |
+| `api-contract-semver-discipline` | same as above |
+| `api-contract-deprecation-policy` | same as above |
 
 Anything else missing from the matrix is a real gap: report it HIGH. Keep this
 list short — it is an exemption list, and every entry is a check that stopped
