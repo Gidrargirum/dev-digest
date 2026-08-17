@@ -15,7 +15,7 @@
       "label": "PR list data settles"
     },
     {
-      "cmd": ["find", "role", "link", "click", "--name", "Conventions"],
+      "cmd": ["find", "text", "Conventions", "click"],
       "label": "open Conventions from the SKILLS LAB sidebar section"
     },
     {
