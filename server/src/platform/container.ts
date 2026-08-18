@@ -29,6 +29,10 @@ import { SkillsRepository } from '../modules/skills/repository.js';
 import type { RepoIntel } from '../modules/repo-intel/types.js';
 import { RepoIntelService } from '../modules/repo-intel/service.js';
 import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
+import type { IntentPort } from '../modules/intent/types.js';
+import { IntentService } from '../modules/intent/service.js';
+import { IntentRepository } from '../modules/intent/repository.js';
+import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 
@@ -53,6 +57,8 @@ export interface ContainerOverrides {
   /** repo-intel T3 adapters — only the indexer pipeline reads these. */
   depgraph?: DepGraph;
   tokenizer?: Tokenizer;
+  /** Intent facade — tests inject a mock IntentPort implementation. */
+  intent?: IntentPort;
 }
 
 export class Container {
@@ -79,6 +85,7 @@ export class Container {
   private _depgraph?: DepGraph;
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
+  private _intent?: IntentPort;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -132,6 +139,26 @@ export class Container {
       new RepoIntelRepository(this.db),
     );
     return this._repoIntel;
+  }
+
+  /**
+   * PR intent facade — derives + caches a PR's intent before review (see
+   * `modules/intent/README.md`). Takes ports, not `this`, for the same
+   * cycle-avoidance reason as `repoIntel` above. Tests inject a mock via
+   * `ContainerOverrides.intent`.
+   */
+  get intent(): IntentPort {
+    if (this.overrides.intent) return this.overrides.intent;
+    this._intent ??= new IntentService(
+      {
+        github: () => this.github(),
+        llm: (provider) => this.llm(provider),
+        featureModelOverride: (workspaceId) =>
+          getFeatureModelOverride(this.db, workspaceId, 'review_intent'),
+      },
+      new IntentRepository(this.db),
+    );
+    return this._intent;
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */

@@ -2,9 +2,10 @@ import { eq } from 'drizzle-orm';
 import {
   FEATURE_MODELS,
   FeatureModelChoice,
+  hasDefaultModel,
   type FeatureModelId,
 } from '@devdigest/shared';
-import type { Container } from '../../platform/container.js';
+import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import { rowsToSettings } from './helpers.js';
 
@@ -18,12 +19,19 @@ import { rowsToSettings } from './helpers.js';
  * constant, so behaviour is unchanged until a model is explicitly picked.
  */
 
-const DEFAULTS = Object.fromEntries(
-  FEATURE_MODELS.map((f) => [f.id, { provider: f.defaultProvider, model: f.defaultModel }]),
-) as Record<FeatureModelId, FeatureModelChoice>;
+const DEFAULTS: Partial<Record<FeatureModelId, FeatureModelChoice>> = Object.fromEntries(
+  FEATURE_MODELS.filter(hasDefaultModel).map((f) => [
+    f.id,
+    { provider: f.defaultProvider, model: f.defaultModel },
+  ]),
+);
 
-/** The registry default (provider+model) for a feature — no DB read. */
-export function defaultFeatureModel(id: FeatureModelId): FeatureModelChoice {
+/**
+ * The registry default (provider+model) for a feature — no DB read.
+ * `undefined` for a feature with no default of its own (`inheritsFrom` set,
+ * e.g. `review_intent`) — callers must fall back to the model it inherits from.
+ */
+export function defaultFeatureModel(id: FeatureModelId): FeatureModelChoice | undefined {
   return DEFAULTS[id];
 }
 
@@ -34,11 +42,11 @@ export function defaultFeatureModel(id: FeatureModelId): FeatureModelChoice {
  * `resolveFeatureModel` instead.
  */
 export async function getFeatureModelOverride(
-  container: Container,
+  db: Db,
   workspaceId: string,
   id: FeatureModelId,
 ): Promise<FeatureModelChoice | undefined> {
-  const rows = await container.db
+  const rows = await db
     .select({ key: t.settings.key, value: t.settings.value })
     .from(t.settings)
     .where(eq(t.settings.workspaceId, workspaceId));
@@ -47,11 +55,15 @@ export async function getFeatureModelOverride(
   return parsed.success ? parsed.data : undefined;
 }
 
-/** Resolve `id` to a concrete provider+model: workspace override, else registry default. */
+/**
+ * Resolve `id` to a concrete provider+model: workspace override, else registry
+ * default. `undefined` when neither exists (a feature with `inheritsFrom` and
+ * no workspace override) — the caller must resolve the inherited feature itself.
+ */
 export async function resolveFeatureModel(
-  container: Container,
+  db: Db,
   workspaceId: string,
   id: FeatureModelId,
-): Promise<FeatureModelChoice> {
-  return (await getFeatureModelOverride(container, workspaceId, id)) ?? DEFAULTS[id];
+): Promise<FeatureModelChoice | undefined> {
+  return (await getFeatureModelOverride(db, workspaceId, id)) ?? DEFAULTS[id];
 }

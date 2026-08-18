@@ -56,6 +56,12 @@ export default function PRDetailPage() {
   const invalidateRunHistory = () => {
     if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
   };
+  // Intent is computed as a side effect of the review run (specs/pr-intent-
+  // layer.md), not its own mutation — nothing else invalidates ["pr-intent",
+  // prId], so without this the INTENT card only ever appears after a reload.
+  const invalidateIntent = () => {
+    if (prId) qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
+  };
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
@@ -134,7 +140,7 @@ export default function PRDetailPage() {
       />
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
-        {tab === "overview" && <OverviewTab prBody={pr.body} />}
+        {tab === "overview" && <OverviewTab prId={prId} prBody={pr.body} />}
 
         {tab === "findings" && (
           <FindingsTab
@@ -156,6 +162,7 @@ export default function PRDetailPage() {
             onRunDone={() => {
               invalidateActiveRuns();
               invalidateRunHistory();
+              invalidateIntent();
               refetchReviews();
             }}
           />

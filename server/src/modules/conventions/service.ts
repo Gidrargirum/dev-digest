@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   FEATURE_MODELS,
   FeatureModelChoice,
+  hasDefaultModel,
   ConventionCategory,
   type ConventionCandidate,
   type ConventionScan,
@@ -478,9 +479,14 @@ export class ConventionsService {
       | undefined
       | null;
     const parsed = FeatureModelChoice.safeParse(raw?.['conventions']);
-    return parsed.success
-      ? parsed.data
-      : { provider: fallback.defaultProvider, model: fallback.defaultModel };
+    if (parsed.success) return parsed.data;
+    if (!hasDefaultModel(fallback)) {
+      // The 'conventions' registry entry always defines a default — this only
+      // trips if that entry is edited into the `inheritsFrom` variant, which
+      // would be a real bug (this feature has no model to inherit from).
+      throw new Error("FEATURE_MODELS entry 'conventions' is missing its default provider/model");
+    }
+    return { provider: fallback.defaultProvider, model: fallback.defaultModel };
   }
 
   /** repo-intel degrades to `[]` rather than throwing — honour that contract. */

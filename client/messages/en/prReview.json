@@ -115,5 +115,17 @@
     "empty": "No findings for this pull request.",
     "error": "Couldn’t load findings.",
     "trigger": "Show findings"
+  },
+  "intent": {
+    "title": "Intent",
+    "inScope": "In scope",
+    "outOfScope": "Out of scope",
+    "riskAreas": "Risk areas",
+    "confidence": "Confidence: {level}",
+    "confidenceLevel": {
+      "low": "low",
+      "medium": "medium",
+      "high": "high"
+    }
   }
 }

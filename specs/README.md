@@ -8,6 +8,7 @@ for features touching more than one package. Normative voice — "must",
 |---|---|
 | [findings-severity-breakdown.md](./findings-severity-breakdown.md) | FINDINGS counters + hover popover on the PR list and the Agent runs timeline |
 | [conventions-extractor.md](./conventions-extractor.md) | Extracting house conventions from a repo and merging the accepted ones into a skill |
+| [pr-intent-layer.md](./pr-intent-layer.md) | Deriving a PR's intent/scope before review, caching it, and surfacing it in the prompt and the Overview tab |
 
 ## What belongs here
 

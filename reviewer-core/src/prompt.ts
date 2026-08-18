@@ -66,6 +66,14 @@ export interface PromptParts {
    * undefined → section omitted.
    */
   prDescription?: string;
+  /**
+   * Derived PR intent (untrusted — synthesized from PR/issue text, a prime
+   * injection vector). A resolved string, already rendered by the caller.
+   * Delimiter-wrapped. Rendered right after `## PR description` and before
+   * `## Skills / rules`. Empty / undefined → section omitted (no behavior
+   * change).
+   */
+  intent?: string;
   /** The unified diff / user task (untrusted content). */
   diff: string;
   /** Optional task framing line, e.g. "Review PR #482 '…'". */
@@ -100,11 +108,20 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     parts.prDescription && parts.prDescription.trim().length > 0
       ? parts.prDescription.slice(0, MAX_PR_DESCRIPTION_CHARS)
       : undefined;
+  // Same "rendered iff non-empty" gate used for the section below — computed
+  // once so `assembly.intent` (specs/pr-intent-layer.md "Prompt contract":
+  // "`null` when the slot wasn't rendered") can never disagree with whether
+  // the `## Derived PR intent` section actually made it into `user`.
+  const intentBlock =
+    parts.intent && parts.intent.trim().length > 0 ? parts.intent : undefined;
 
   const userSections: string[] = [];
   if (parts.task) userSections.push(parts.task);
   if (prDescription) {
     userSections.push(`## PR description\n${wrapUntrusted('pr-description', prDescription)}`);
+  }
+  if (intentBlock) {
+    userSections.push(`## Derived PR intent\n${wrapUntrusted('intent', intentBlock)}`);
   }
   if (skillsBlock) userSections.push(`## Skills / rules\n${skillsBlock}`);
   if (memoryBlock) userSections.push(`## Relevant memory\n${memoryBlock}`);
@@ -134,6 +151,7 @@ export function assemblePrompt(parts: PromptParts): AssembledPrompt {
     callers: parts.callers ?? null,
     repo_map: parts.repoMap ?? null,
     pr_description: prDescription ?? null,
+    intent: intentBlock ?? null,
     user,
   };
 

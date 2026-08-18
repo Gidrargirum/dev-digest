@@ -37,20 +37,41 @@ export function SettingsModels() {
       <SectionTitle title={t("models.title")} body={t("models.body")} />
 
       {FEATURE_MODELS.map((f) => {
-        const current = chosen[f.id]?.model ?? f.defaultModel;
-        const isDefault = !chosen[f.id];
+        const override = chosen[f.id];
+        // `defaultModel` is optional on the shared type: a feature with
+        // `inheritsFrom` (e.g. review_intent) carries no default of its own —
+        // until the workspace picks one, it silently inherits the review
+        // agent's model at run time. The select stays controlled either way.
+        const inherited = !override && !!f.inheritsFrom;
+        const current = override?.model ?? f.defaultModel ?? "";
+        const isDefault = !override && !f.inheritsFrom;
         // Ensure the current value is selectable even if it isn't in the live
         // OpenRouter list (e.g. an OpenAI registry default, or an empty list).
-        const options = baseOptions.some((o) => (typeof o === "string" ? o : o.value) === current)
-          ? baseOptions
-          : [current, ...baseOptions];
+        const options =
+          current === "" ||
+          baseOptions.some((o) => (typeof o === "string" ? o : o.value) === current)
+            ? baseOptions
+            : [current, ...baseOptions];
         return (
-          <div key={f.id} style={s.row}>
+          // `role="group"` + the feature's own label is the only accessible
+          // handle on a row: the vendored SearchableSelect trigger is a bare
+          // clickable <div> with no role or name, and `vendor/ui` is not ours
+          // to edit.
+          <div key={f.id} style={s.row} role="group" aria-label={f.label}>
             <FormField
               label={
                 <>
                   {f.label}
-                  {isDefault && <span style={s.defaultTag}>{t("models.usingDefault")}</span>}
+                  {isDefault && (
+                    <span style={s.defaultTag} data-testid="feature-model-tag">
+                      {t("models.usingDefault")}
+                    </span>
+                  )}
+                  {inherited && (
+                    <span style={s.defaultTag} data-testid="feature-model-tag">
+                      {t("models.inheritFromReviewAgent")}
+                    </span>
+                  )}
                 </>
               }
               hint={f.description}
@@ -59,7 +80,7 @@ export function SettingsModels() {
                 value={current}
                 onChange={(m) => setModel(f.id, m)}
                 options={options}
-                placeholder={t("models.search")}
+                placeholder={inherited ? t("models.inheritFromReviewAgent") : t("models.search")}
               />
             </FormField>
           </div>

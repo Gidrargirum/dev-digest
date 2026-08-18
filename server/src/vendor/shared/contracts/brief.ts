@@ -6,10 +6,16 @@ import { z } from 'zod';
  */
 
 // ---- Intent ----
+export const IntentConfidence = z.enum(['low', 'medium', 'high']);
+export type IntentConfidence = z.infer<typeof IntentConfidence>;
+
 export const Intent = z.object({
   intent: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
+  risk_areas: z.array(z.string()).default([]),
+  confidence: IntentConfidence.default('low'),
+  sources: z.array(z.string()).default([]),
 });
 export type Intent = z.infer<typeof Intent>;
 
