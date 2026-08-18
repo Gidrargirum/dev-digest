@@ -15,7 +15,7 @@ export function OverviewTab({ prId, prBody }: OverviewTabProps) {
   const { data: intent } = usePrIntent(prId);
 
   return (
-    <>
+    <div style={s.column}>
       {intent && <IntentCard intent={intent} />}
 
       {prBody && (
@@ -24,6 +24,6 @@ export function OverviewTab({ prId, prBody }: OverviewTabProps) {
           <div style={s.descriptionBox}>{prBody}</div>
         </section>
       )}
-    </>
+    </div>
   );
 }
