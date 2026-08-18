@@ -129,6 +129,7 @@ or an `.md` file added under `e2e/specs/`.
   without updating `server-unit.yml` and `server-integration.yml`, which inline
   the split on purpose;
 - a `.claude/skills/**` change that makes `node scripts/check-skills-lock.mjs` fail.
+- an agent in `.claude/agents/**` whose `skills:` names a skill that does not exist in `.claude/skills/` — the agent fails to load, silently.
 
 > Source: root `AGENTS.md` "Do not touch", `server/AGENTS.md` "Gotchas",
 > `.github/workflows/guards.yml`, `TESTING.md`.
