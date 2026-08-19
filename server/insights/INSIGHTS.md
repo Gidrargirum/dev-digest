@@ -89,6 +89,14 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   caller-supplied string as a positional argument needs the same treatment, and
   callers passing model-authored patterns should reject a leading `-` as well.
 
+- **2026-08-19** — `RunLogger` (`src/platform/run-logger.ts`) has no `warn`; the
+  methods are `event/info/tool/result/error/step`. `.step()` is also the wrong
+  wrapper for a best-effort stage: on throw it emits an `error`-kind event **and
+  re-throws**, so the Live Log paints the whole run as failed for a step the run
+  actually survived. Wrap the optional work in your own try/catch and report the
+  failure with `runLog.info(...)` — the pattern `buildCallersDigest` /
+  `buildRepoMapDigest` / the intent step in `reviews/run-executor.ts` already use.
+
 ## Recurring Errors & Fixes
 
 - **2026-08-13** — An integration test that injects `ContainerOverrides.repoIntel`
