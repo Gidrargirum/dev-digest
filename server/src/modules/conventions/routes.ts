@@ -5,8 +5,13 @@
  *   GET  /repos/:id/conventions                         → ConventionsPage
  *   GET  /repos/:id/conventions/scans/:scanId/events    → SSE scan progress
  *   PATCH /conventions/:id                              → ConventionCandidate
- *   POST /repos/:id/conventions/skill/preview           → ConventionSkillDraft
- *   POST /repos/:id/conventions/skill                   → 201 Skill
+ *   POST /repos/:id/conventions/skill/preview           → ConventionSkillDraft   (legacy, one merged draft)
+ *   POST /repos/:id/conventions/skill                   → 201 Skill              (legacy, one merged skill)
+ *   POST /repos/:id/conventions/skills/preview          → ConventionSkillDraftSet (one draft per category)
+ *   POST /repos/:id/conventions/skills                  → 201 ConventionSkillsResult
+ *
+ * The plural routes are additive: the singular ones above keep working
+ * unchanged (removed only in a later step, once every caller has moved over).
  *
  * Job-handler registration happens here, once at boot, mirroring
  * `repo-intel/routes.ts`: the extraction runs on the JobRunner, so the POST
@@ -49,6 +54,15 @@ const CreateSkillBody = z.object({
   body: z.string().min(1),
   enabled: z.boolean().optional(),
   convention_ids: z.array(z.string().uuid()).min(1),
+  agent_ids: z.array(z.string().uuid()).optional(),
+});
+
+// Same shape as `CreateSkillBody` minus `agent_ids` — derived, not
+// retyped, so a validation change to one can't silently miss the other.
+const SkillDraftBody = CreateSkillBody.omit({ agent_ids: true });
+
+const CreateSkillsBody = z.object({
+  drafts: z.array(SkillDraftBody).min(1),
   agent_ids: z.array(z.string().uuid()).optional(),
 });
 
@@ -171,6 +185,39 @@ export default async function conventionsRoutes(appBase: FastifyInstance) {
       if (!skill) throw new NotFoundError('No matching conventions found');
       reply.code(201);
       return skill;
+    },
+  );
+
+  app.post(
+    '/repos/:id/conventions/skills/preview',
+    { schema: { params: IdParams, body: SkillPreviewBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(container, req);
+      const drafts = await service.skillDrafts(workspaceId, req.params.id, req.body.convention_ids);
+      if (!drafts) throw new NotFoundError('Repo not found');
+      return { drafts };
+    },
+  );
+
+  app.post(
+    '/repos/:id/conventions/skills',
+    { schema: { params: IdParams, body: CreateSkillsBody } },
+    async (req, reply) => {
+      const { workspaceId } = await getContext(container, req);
+      const skills = await service.createSkills(workspaceId, req.params.id, {
+        drafts: req.body.drafts.map((d) => ({
+          name: d.name,
+          description: d.description,
+          type: d.type,
+          body: d.body,
+          ...(d.enabled !== undefined ? { enabled: d.enabled } : {}),
+          conventionIds: d.convention_ids,
+        })),
+        ...(req.body.agent_ids !== undefined ? { agentIds: req.body.agent_ids } : {}),
+      });
+      if (!skills) throw new NotFoundError('No matching conventions found');
+      reply.code(201);
+      return { skills };
     },
   );
 }

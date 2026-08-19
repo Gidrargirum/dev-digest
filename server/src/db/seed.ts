@@ -19,6 +19,22 @@ const DEFAULT_PROVIDER = 'openrouter' as const;
 const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
 
 /**
+ * Pre-wired agent <-> skill links (Skills Lab demo data). Module-level (not
+ * inside `seed()`) so it is unit-testable without Docker — a test can assert
+ * every `skillName` here actually exists in `SEED_SKILLS` without touching
+ * Postgres.
+ */
+export const AGENT_SKILL_LINKS: Array<{ agentName: string; skillName: string; order: number }> = [
+  { agentName: 'Test Quality Reviewer', skillName: 'test-quality-rubric', order: 0 },
+  { agentName: 'Test Quality Reviewer', skillName: 'pr-quality-rubric', order: 1 },
+  { agentName: 'API Contract Reviewer', skillName: 'api-contract-breaking-change', order: 0 },
+  { agentName: 'API Contract Reviewer', skillName: 'pr-quality-rubric', order: 1 },
+  { agentName: 'API Contract Reviewer', skillName: 'api-contract-response-schema', order: 2 },
+  { agentName: 'API Contract Reviewer', skillName: 'api-contract-semver-discipline', order: 3 },
+  { agentName: 'API Contract Reviewer', skillName: 'api-contract-deprecation-policy', order: 4 },
+];
+
+/**
  * Seed the starter's demo data. Idempotent: re-running upserts the default
  * workspace/user and the demo fixtures.
  *
@@ -303,13 +319,7 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
   // ---- agent <-> skill links (Test Quality + API Contract come pre-wired) ----
   // Skills are opt-in; General/Security/Performance stay without links so a
   // student sees at least one agent demonstrating prompt assembly with skills.
-  const agentSkillLinks: Array<{ agentName: string; skillName: string; order: number }> = [
-    { agentName: 'Test Quality Reviewer', skillName: 'test-quality-rubric', order: 0 },
-    { agentName: 'Test Quality Reviewer', skillName: 'pr-quality-rubric', order: 1 },
-    { agentName: 'API Contract Reviewer', skillName: 'api-contract-breaking-change', order: 0 },
-    { agentName: 'API Contract Reviewer', skillName: 'pr-quality-rubric', order: 1 },
-  ];
-  for (const link of agentSkillLinks) {
+  for (const link of AGENT_SKILL_LINKS) {
     const [agent] = await db
       .select()
       .from(t.agents)

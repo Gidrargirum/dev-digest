@@ -85,6 +85,379 @@ or exported API handler in a way that breaks existing callers.
 - A brand-new route or a field being ADDED (not removed/renamed/narrowed) is
   not a breaking change — do not flag additive changes.`;
 
+export const API_CONTRACT_RESPONSE_SCHEMA_BODY = `# API contract — response schema
+
+Evaluate whether this diff changes the SHAPE of an existing API response body
+in a way that breaks existing callers. Scope is response body shape only.
+
+This skill does **not** cover the route path, HTTP method, request body,
+query/path parameters, or status codes — that's \`api-contract-breaking-change\`.
+It does **not** cover whether a breaking change requires a semver/version bump
+— that's \`api-contract-semver-discipline\`. It does **not** cover how long an
+old shape must stay supported before removal — that's
+\`api-contract-deprecation-policy\`. Don't duplicate those rubrics here; only
+judge the shape of the response payload itself.
+
+## Field removal and rename
+
+- Flag any response field being removed from an existing endpoint's payload.
+- Flag any response field being renamed — this is indistinguishable from a
+  removal-plus-addition to a caller reading the old name.
+- Flag a field moving from the top level into a nested object (or vice versa)
+  under a new or different key — callers keying off the old path break even
+  though the value still exists somewhere in the payload.
+
+## Type changes
+
+- Flag a response field's type changing (e.g. \`string\` → \`number\`,
+  \`boolean\` → \`string\`, \`number\` → \`string\`).
+- Flag a scalar field becoming an object or array, or an object/array field
+  becoming a scalar (e.g. \`tags: string\` → \`tags: string[]\`, or
+  \`address: Address\` → \`address: string\`).
+- Flag a previously single-object field becoming an array of that object, or
+  an array field collapsing to a single object — both break callers that
+  assume the old cardinality (\`.map()\` on a value that's no longer an array,
+  or direct property access on a value that's now an array).
+
+## Nullability and optionality
+
+- Flag a nullable/optional response field becoming non-nullable/required, or
+  the reverse, where existing callers may branch on \`null\`/\`undefined\` (e.g.
+  a null-check that becomes dead code, or a consumer that never expected
+  \`null\` and now receives it).
+- Flag a field that was always present becoming conditionally omitted
+  (\`undefined\`) based on new server-side logic — strict/typed clients that
+  assume the field always exists will fail to deserialize.
+- Flag a previously optional response field being marked as always present
+  going forward if any existing code path can still omit it — the type
+  promise and the runtime behavior must match.
+
+## Enums and constrained values
+
+- Flag an enum value being removed from a response field that existing
+  callers may already be switching/mapping on (narrowing the value space is
+  breaking even though it looks like "fewer cases to handle").
+- Flag an enum field's value casing or format changing (e.g. \`"ACTIVE"\` →
+  \`"active"\`) — string comparisons in calling code will silently stop
+  matching.
+
+## Nested structure changes
+
+- Flag a nested object's internal structure being flattened, restructured, or
+  having a sub-field relocated to a different parent (e.g.
+  \`user.address.city\` → \`user.city\`, or \`user: { name, email }\` → separate
+  \`userName\`/\`userEmail\` top-level fields).
+- Flag a previously flat set of fields being wrapped in a new nested object
+  with no corresponding top-level fallback.
+
+## Pagination and envelope changes
+
+- Flag a paginated response's wrapper/envelope key changing (e.g.
+  \`items\` → \`data\`, \`results\` → \`records\`) — this breaks every consumer
+  unwrapping the old key.
+- Flag the cursor or pagination-token format changing (e.g. an offset integer
+  becoming an opaque base64 cursor, or a \`nextPage\` number becoming a
+  \`nextCursor\` string) — clients that persist or construct these values break.
+- Flag the total-count or has-more-pages field being removed, renamed, or
+  changed from a boolean to a different signal.
+
+## Error-response shape
+
+- Flag an error response's shape changing — a field on the error object
+  being renamed or removed (e.g. \`error.message\` → \`error.detail\`,
+  \`error.code\` disappearing) — error-handling code that reads specific
+  fields for user-facing messages or programmatic branching breaks silently.
+- Flag the overall error envelope changing (e.g. a bare error object becoming
+  wrapped in \`{ error: {...} }\`, or vice versa).
+
+## Date and number format changes
+
+- Flag a date/timestamp field's format changing (e.g. ISO 8601 string →
+  Unix epoch number, or seconds-since-epoch → milliseconds-since-epoch)
+  without an additive compatibility field — typed clients that parse the
+  old format will throw or silently produce \`Invalid Date\`/\`NaN\`.
+- Flag a numeric field's precision or units changing (e.g. cents → dollars,
+  integer → float) without a rename that makes the new unit unambiguous.
+
+## Exemptions
+
+- A new field being purely ADDED to an existing response is not a breaking
+  change — do not flag additive fields, even if they change the response's
+  overall size or nesting depth, as long as every previously-existing field
+  keeps its name, type, and nullability.
+- A field being added to an error response purely for extra debugging/context
+  (with existing error fields untouched) is not a breaking change.
+- A shape change gated behind a version marker (e.g. a route under \`/v2/\`) or
+  behind content negotiation (a different \`Accept\` header or a
+  \`Content-Type\` variant) is not breaking on its own merit — the old shape
+  must still be reachable through the old route/negotiation path unchanged.
+
+## Examples
+
+**Bad**
+
+\`\`\`diff
+ interface OrderResponse {
+   id: string;
+-  createdAt: string; // ISO 8601, e.g. "2026-08-14T10:00:00Z"
++  createdAt: number; // unix epoch ms
+   total: number;
+ }
+\`\`\`
+
+The field name and type promise are unchanged from the caller's point of
+view (\`createdAt\` was always a JS "date"), but the wire format silently
+flips from an ISO string to an epoch number. Any client calling \`new
+Date(createdAt)\` on the old format now gets a nonsensical date, and strict
+JSON-schema/typed deserializers that pinned \`string\` will fail outright with
+no version marker to signal the change.
+
+**Good**
+
+\`\`\`diff
+ interface OrderResponse {
+   id: string;
+   createdAt: string; // ISO 8601, unchanged
++  createdAtEpoch: number; // unix epoch ms, new field for clients that want it
+   total: number;
+ }
+\`\`\`
+
+The existing \`createdAt\` field keeps its name, type, and format, so no
+existing caller breaks. Clients that want the epoch format can adopt the new
+\`createdAtEpoch\` field at their own pace — this is a pure additive change.
+
+## Findings discipline
+
+Cite the exact \`file:line\` of the changed response type, serializer, or
+schema. Use severity **CRITICAL** when a typed or strict client would fail to
+deserialize the new shape or would silently misinterpret it (wrong type,
+wrong format, renamed/removed field with no fallback). Use severity
+**WARNING** when the change is real but only affects an edge case, an
+undocumented/internal field, or loosely-typed consumers that read the
+payload dynamically without a schema.`;
+
+export const API_CONTRACT_SEMVER_DISCIPLINE_BODY = `# API contract — semver discipline
+
+This skill assumes a breaking change may already be present in the diff —
+either found directly by inspection, or flagged by a sibling skill
+(**api-contract-breaking-change** for route/request/status-code breaks,
+**api-contract-response-schema** for response body shape breaks). Its job is
+not to re-detect the break. It checks whether the diff's *version story* is
+honest: does a breaking change carry a major bump / new version path/header,
+or does it merge into an existing version as if nothing changed. Deprecation
+windows ahead of removal are a separate concern — see
+**api-contract-deprecation-policy**.
+
+## Bump rules
+
+| Change type | Requirement |
+|---|---|
+| Backward-incompatible change to an existing, already-released endpoint's contract (removed/renamed field, narrowed validation, changed status code, changed type) | MAJOR required — new version path (\`/v2/\`) or version header bump; merging it under the unchanged version is non-compliant |
+| Purely additive change (new optional field, new endpoint, new optional query param) | MINOR-safe — no major bump needed |
+| Bug fix that restores documented behavior, or an internal-only change with zero observable contract change | PATCH-safe — no major bump needed |
+
+## Silent breaks
+
+- Flag a breaking change (as found directly, or per api-contract-breaking-change /
+  api-contract-response-schema) merged with no accompanying new version
+  path/header and no deprecation window.
+- Flag a breaking change applied in place to an existing versioned route
+  (e.g. editing \`/v1/orders\` handler directly) instead of introducing the
+  change under a new version.
+
+## New-version correctness
+
+- Flag a new \`/v2/\`-style route (or version-header value) introduced that is
+  documented or described as a compatible replacement path but is not
+  actually a strict superset-compatible replacement — i.e. it silently drops
+  or narrows something the old version supported without calling that out.
+- Flag a new version path that does not coexist with the old one at all when
+  the PR claims backward compatibility is preserved.
+
+## Bump hygiene
+
+- Flag (SUGGESTION only, not a blocker) a version bump in name only — e.g. a
+  route renamed to \`/v2/\` whose request/response contract is byte-identical
+  to \`/v1/\` — this wastes a version bump and misleads consumers into
+  expecting a change.
+- Flag multiple unrelated breaking changes bundled into a single version bump
+  without each one being called out individually in the PR
+  description/changelog — reviewers and consumers should be able to see what
+  actually changed under the new version, not just that "something" did.
+
+## Exemptions
+
+- Routes explicitly marked unstable/experimental (e.g. under a \`/beta/\`
+  prefix, or gated behind an \`x-experimental\` header/flag) are exempt from
+  strict semver discipline — breaking them without a version bump is
+  allowed. Still flag as SUGGESTION if the PR gives no note at all about the
+  break, since even experimental consumers benefit from a heads-up.
+- Internal-only endpoints not exposed to external consumers may be exempted
+  case-by-case. Recognize these by an internal routing prefix (e.g.
+  \`/internal/\`, \`/_internal/\`), absence from any public SDK or published
+  OpenAPI/contract document, or explicit code comments/route metadata marking
+  the endpoint internal-only. When in doubt whether an endpoint is truly
+  internal, do not assume exemption — treat it as public and apply the bump
+  rules above.
+
+## Examples
+
+**Bad**
+\`\`\`
+- DELETE-able field: \`discountCode\` removed from the response of
+  \`PATCH /api/orders/:id\`
+- Route path unchanged: still \`/api/orders/:id\`
+- No API-Version header change, no /v2/ path
+- PR description: "cleaned up unused order fields"
+\`\`\`
+This is a MAJOR-worthy break (removed response field on a released endpoint)
+shipped with zero version signal. Existing consumers reading \`discountCode\`
+break with no warning and no migration path.
+
+**Good**
+\`\`\`
+- \`discountCode\` removed from the response, but only under the new route:
+  \`PATCH /api/v2/orders/:id\`
+- \`PATCH /api/v1/orders/:id\` unchanged, still returns \`discountCode\`
+- PR description: "v2: drops deprecated discountCode field per
+  api-contract-deprecation-policy notice from 2026-06-01"
+\`\`\`
+The break exists only behind a new version path; the old version keeps
+working for existing callers, and the changelog names the specific
+breaking change instead of burying it in a generic bump.
+
+## Findings discipline
+
+- Cite the exact file:line of the changed route/handler/schema and, where
+  applicable, the line introducing or omitting the version signal.
+- Severity CRITICAL: a breaking change ships with no version signal at
+  all (no new path, no header bump, no deprecation note).
+- Severity WARNING: a version signal exists but is incomplete — e.g. a new
+  version path was added but the old path was removed instead of kept
+  alongside it, or the changelog bundles multiple breaks under one bump
+  without itemizing them.
+- Severity SUGGESTION: pure hygiene issues — an unnecessary/no-op version
+  bump, or a version note that is undocumented but does not affect any
+  actual break.`;
+
+export const API_CONTRACT_DEPRECATION_POLICY_BODY = `# API contract — deprecation policy
+
+Evaluate whether a PUBLIC API element being removed, replaced, or changed in
+this diff went through a proper deprecation cycle — or whether it was
+silently removed with no warning trail.
+
+## Scope
+
+This skill judges **process**, not mechanics: was the removal/change of a
+route, field, enum value, header, or param preceded by a deprecation
+marker, an announced replacement, and a sunset window — or is a new
+deprecation being introduced correctly. It does not judge whether the
+underlying change is technically breaking (that's
+\`api-contract-breaking-change\`), whether a response body's shape changed
+(that's \`api-contract-response-schema\`), or whether the package/API version
+was bumped correctly (that's \`api-contract-semver-discipline\`). Assume the
+change under review already qualifies as a removal or behavior change of a
+public element — this skill only asks: was it deprecated first?
+
+## What counts as a deprecation marker
+
+Treat any of the following, found anywhere in the diff or the linked
+changelog/migration guide, as valid evidence of prior deprecation:
+
+- An \`@deprecated\` JSDoc/docstring tag that states a reason and points to the
+  replacement.
+- A \`Deprecation\` or \`Sunset\` HTTP response header (RFC 8594) present on the
+  endpoint.
+- An explicit entry in a CHANGELOG or migration guide announcing the
+  deprecation.
+- A runtime warning surfaced to callers — a deprecation log line or a
+  warning field in the response body.
+
+Absence of all four is absence of a deprecation trail.
+
+## Flag missing deprecation trail on removal
+
+- Flag any route, field, enum value, header, or param being REMOVED in this
+  diff when the diff and the linked changelog show no evidence it was
+  previously marked deprecated by any of the markers above.
+- Flag a removal that references "deprecated" in a commit message or PR
+  description only, with no marker actually present in a prior release's
+  code, headers, or changelog — talk is not a deprecation trail.
+
+## Flag incomplete new deprecations
+
+- Flag a NEW deprecation being introduced in this diff (a route, field, or
+  param newly marked \`@deprecated\`, or a new \`Deprecation\` header) that has
+  no replacement or migration pointer explaining what callers should use
+  instead.
+- Flag a deprecation marker with no sunset date or target version at all —
+  open-ended deprecation with no removal target is a smell, not a blocker;
+  file it as SUGGESTION severity, not CRITICAL/WARNING.
+
+## Flag behavior changes to already-deprecated elements
+
+- Flag any silent behavior change (new validation, different response
+  shape, changed default) to something already marked deprecated in a prior
+  release. Deprecated elements should be frozen except for security fixes —
+  changing them resets the clock and confuses callers who are mid-migration.
+
+## Flag early removal
+
+- Flag a removal happening sooner than the sunset window the deprecation
+  itself stated — e.g. marked deprecated with "removal in v3" but actually
+  removed in this diff while the package is still on v2.
+
+## Exemptions
+
+- Removing something that was NEVER released publicly (still pre-release,
+  beta, or internal-only, or added and removed within the same unreleased
+  version) does not need a deprecation cycle — do not flag it.
+- Security-critical removals (e.g. an endpoint tied to an active
+  vulnerability) may bypass the normal sunset window. Still flag these, but
+  at SUGGESTION severity, to confirm the exception is documented and
+  affected callers are notified out-of-band.
+
+## Examples
+
+**Bad**
+\`\`\`
+- app.delete('/api/users/:id/legacy-profile', legacyProfileHandler)
+\`\`\`
+The route \`/api/users/:id/legacy-profile\` is deleted outright in this diff.
+No \`@deprecated\` marker, \`Deprecation\`/\`Sunset\` header, or changelog entry
+exists anywhere in the repo history for this route — callers had zero
+warning. Flag as CRITICAL.
+
+**Good**
+\`\`\`
+// v1.4.0 (prior release):
+/**
+ * @deprecated since v1.4.0, removed in v2.0.0. Use GET /api/users/:id?include=profile instead.
+ */
+app.get('/api/users/:id/legacy-profile', legacyProfileHandler, {
+  headers: { Deprecation: 'true', Sunset: 'Wed, 01 Jan 2026 00:00:00 GMT' },
+})
+
+// this diff (v2.0.0, after the sunset date):
+- app.get('/api/users/:id/legacy-profile', legacyProfileHandler, { ... })
++ // CHANGELOG.md: "Removed /legacy-profile per the v1.4.0 deprecation notice."
+\`\`\`
+The route was marked deprecated two releases ago with a stated replacement
+and sunset date, and this diff removes it only after that date has passed,
+with a changelog entry documenting the removal. No flag.
+
+## Findings discipline
+
+- Cite the exact file:line of the removal or the new deprecation marker.
+- Severity CRITICAL: a public element removed or changed with zero
+  deprecation trail and no exemption applies.
+- Severity WARNING: a deprecation trail exists but is incomplete — missing a
+  replacement pointer, or removal happening before the stated sunset window.
+- Severity SUGGESTION: hygiene issues only — an open-ended deprecation with
+  no sunset date, or an early/undocumented removal that qualifies under an
+  exemption but should still be recorded.`;
+
 export const NO_THEN_CHAINS_BODY = `# No .then() chains
 
 Prefer \`async/await\` over \`.then()\`/\`.catch()\` promise chains in all
@@ -190,6 +563,33 @@ export const SEED_SKILLS: SeedSkillDef[] = [
     type: 'custom',
     source: 'manual',
     body: API_CONTRACT_BREAKING_CHANGE_BODY,
+    enabled: true,
+  },
+  {
+    name: 'api-contract-response-schema',
+    description:
+      'Detects changes to the SHAPE of an API response body — field removal/rename, type changes, nullability flips, enum narrowing, nested structure and pagination-envelope changes.',
+    type: 'custom',
+    source: 'manual',
+    body: API_CONTRACT_RESPONSE_SCHEMA_BODY,
+    enabled: true,
+  },
+  {
+    name: 'api-contract-semver-discipline',
+    description:
+      'Evaluates whether a breaking API change correctly reflects a major version bump (new version path / API-Version header) instead of shipping silently under an unchanged version.',
+    type: 'custom',
+    source: 'manual',
+    body: API_CONTRACT_SEMVER_DISCIPLINE_BODY,
+    enabled: true,
+  },
+  {
+    name: 'api-contract-deprecation-policy',
+    description:
+      'Detects whether a public API element being removed or changed went through a proper deprecation cycle — marked, announced, given a migration path and a sunset window.',
+    type: 'custom',
+    source: 'manual',
+    body: API_CONTRACT_DEPRECATION_POLICY_BODY,
     enabled: true,
   },
   {

@@ -547,6 +547,110 @@ d('conventions extractor', () => {
     expect(row!.skillId).toBe(skill.id);
   });
 
+  it('POST …/skills creates N skills, stamps every used convention with skill_id, and a re-scan does not re-propose them', async () => {
+    await resetConventions();
+    const app = await makeApp({});
+    await app.inject({ method: 'POST', url: `/repos/${repoId}/conventions/extract` });
+    const page = await waitForScan(app);
+
+    const real = page.candidates.find((c: { rule: string }) => c.rule === REAL_RULE.rule);
+    const config = page.candidates.find((c: { origin: string }) => c.origin === 'config');
+    await app.inject({
+      method: 'PATCH',
+      url: `/conventions/${real.id}`,
+      payload: { status: 'accepted' },
+    });
+    await app.inject({
+      method: 'PATCH',
+      url: `/conventions/${config.id}`,
+      payload: { status: 'accepted' },
+    });
+
+    const previewRes = await app.inject({
+      method: 'POST',
+      url: `/repos/${repoId}/conventions/skills/preview`,
+      payload: {},
+    });
+    expect(previewRes.statusCode).toBe(200);
+    const { drafts } = previewRes.json();
+    // Two accepted candidates, each the sole accepted one in its category
+    // ('async' and the config rule's category) — both merge into one general
+    // draft rather than getting a category skill of their own.
+    expect(drafts.length).toBeGreaterThan(0);
+
+    const created = await app.inject({
+      method: 'POST',
+      url: `/repos/${repoId}/conventions/skills`,
+      payload: {
+        drafts: drafts.map((d: { name: string; description: string; body: string; convention_ids: string[] }) => ({
+          name: d.name,
+          description: d.description,
+          body: d.body,
+          convention_ids: d.convention_ids,
+        })),
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const { skills } = created.json();
+    expect(skills).toHaveLength(drafts.length);
+
+    // Both source conventions are stamped with a skill_id.
+    const [realRow] = await pg.handle.db
+      .select({ skillId: t.conventions.skillId })
+      .from(t.conventions)
+      .where(eq(t.conventions.id, real.id));
+    const [configRow] = await pg.handle.db
+      .select({ skillId: t.conventions.skillId })
+      .from(t.conventions)
+      .where(eq(t.conventions.id, config.id));
+    expect(realRow!.skillId).toBeTruthy();
+    expect(configRow!.skillId).toBeTruthy();
+
+    // A re-scan must not re-propose either rule — they are already in a skill.
+    await app.inject({ method: 'POST', url: `/repos/${repoId}/conventions/extract` });
+    const second = await waitForScan(app);
+    const pendingRules = second.candidates
+      .filter((c: { status: string }) => c.status === 'pending')
+      .map((c: { rule: string }) => c.rule);
+    expect(pendingRules).not.toContain(REAL_RULE.rule);
+  });
+
+  it('refuses to build any skill from a multi-draft set when one convention_id does not resolve', async () => {
+    await resetConventions();
+    const app = await makeApp({});
+    await app.inject({ method: 'POST', url: `/repos/${repoId}/conventions/extract` });
+    const page = await waitForScan(app);
+    const real = page.candidates[0];
+
+    const beforeSkills = (await app.inject({ method: 'GET', url: '/skills' })).json();
+
+    const res = await app.inject({
+      method: 'POST',
+      url: `/repos/${repoId}/conventions/skills`,
+      payload: {
+        drafts: [
+          {
+            name: 'partial-1',
+            description: 'This one is fully valid',
+            body: '# partial-1',
+            convention_ids: [real.id],
+          },
+          {
+            name: 'partial-2',
+            description: 'This one references a foreign id',
+            body: '# partial-2',
+            convention_ids: ['00000000-0000-0000-0000-000000000000'],
+          },
+        ],
+      },
+    });
+    // A partial resolve must refuse the WHOLE request — not just the bad draft.
+    expect(res.statusCode).toBe(404);
+
+    const afterSkills = (await app.inject({ method: 'GET', url: '/skills' })).json();
+    expect(afterSkills.length).toBe(beforeSkills.length);
+  });
+
   it('refuses to read an evidence path that escapes the clone', async () => {
     await resetConventions();
     const traversal = {

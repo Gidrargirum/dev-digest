@@ -189,8 +189,17 @@ export interface RepoIntel {
    * T2/T3: persistent `references.decl_file IS NULL`.
    */
   getUnresolvedReferences(repoId: string, files: string[]): Promise<RefRow[]>;
-  /** Top-N file paths by rank, filtered of tests/configs. */
-  getConventionSamples(repoId: string, n: number): Promise<string[]>;
+  /**
+   * Stratified file sample by rank (routes/service/repository/component/hook/
+   * other), filtered of tests/configs. `opts.strata` is an optional hint at
+   * the number of strata callers care about; the facade degrades to `[]`
+   * when repo-intel is disabled.
+   */
+  getConventionSamples(
+    repoId: string,
+    n: number,
+    opts?: { strata?: number },
+  ): Promise<string[]>;
 
   // --- T3: onboarding reading-path + critical paths (graph required) ------
   getTopFilesByRank(

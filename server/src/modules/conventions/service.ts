@@ -13,10 +13,12 @@ import {
   type RepoRef,
 } from '@devdigest/shared';
 import { wrapUntrusted } from '@devdigest/reviewer-core';
+import { withTimeout } from '../../platform/resilience.js';
 import type { Container } from '../../platform/container.js';
 import { ConventionsRepository, type InsertConvention } from './repository.js';
 import {
   buildSkillDraft,
+  buildSkillDrafts,
   capPerCategory,
   findSnippetLine,
   isSafePattern,
@@ -31,6 +33,7 @@ import {
 import {
   CONFIG_FILES,
   EXTRACTION_BATCH_SIZE,
+  EXTRACTION_CONCURRENCY,
   EXTRACT_JOB_KIND,
   MAX_FILE_BYTES,
   MAX_GREP_MATCHES,
@@ -110,6 +113,21 @@ export interface CreateConventionSkillInput {
   body: string;
   enabled?: boolean;
   conventionIds: string[];
+  agentIds?: string[];
+}
+
+/** One skill to create, without the agent linking — that is shared across the set. */
+export interface CreateConventionSkillDraftInput {
+  name: string;
+  description: string;
+  type: SkillType;
+  body: string;
+  enabled?: boolean;
+  conventionIds: string[];
+}
+
+export interface CreateConventionSkillsInput {
+  drafts: CreateConventionSkillDraftInput[];
   agentIds?: string[];
 }
 
@@ -236,44 +254,73 @@ export class ConventionsService {
       let costUsd = 0;
 
       if (rankedPaths.length > 0 && !outOfTime()) {
-        const choice = await this.resolveModel(workspaceId);
-        model = choice.model;
-        const llm = await this.container.llm(choice.provider);
-        const sources = await this.readSources(repoRef, rankedPaths);
+        // The scan's own deadline is a real backstop, not just a between-steps
+        // check: MEASURED on a real scan, a hung batch left zero log events
+        // for 10+ minutes with none of the per-call timeouts below ever firing
+        // (see `EXTRACTION_CONCURRENCY`'s comment in constants.ts). Racing the
+        // whole phase against the remaining budget guarantees `runExtract`'s
+        // own `finally` still writes a terminal scan state — degrading to
+        // config-only rules — instead of leaving the row on `running` forever.
+        try {
+          await withTimeout(
+            (async () => {
+              const choice = await this.resolveModel(workspaceId);
+              model = choice.model;
+              const llm = await this.container.llm(choice.provider);
+              const sources = await this.readSources(repoRef, rankedPaths);
 
-        if (sources.length === 0) {
-          log('No readable source files in the clone — skipping model extraction.');
-        } else {
-          const selection = await this.selectFiles(llm, choice.model, sources, log).catch(() => {
-            log('File selection failed — falling back to all sampled files.');
-            return { files: sources, tokensIn: 0, tokensOut: 0, costUsd: 0 };
-          });
-          const selected = selection.files;
-          tokensIn += selection.tokensIn;
-          tokensOut += selection.tokensOut;
-          costUsd += selection.costUsd;
+              if (sources.length === 0) {
+                log('No readable source files in the clone — skipping model extraction.');
+                return;
+              }
 
-          const batches = outOfTime() ? [] : chunk(selected, EXTRACTION_BATCH_SIZE);
-          if (batches.length === 0) {
-            log('Out of time before extraction — keeping the config-derived rules only.');
-          } else {
-            log(`Extracting from ${selected.length} file(s) in ${batches.length} batch(es).`);
-          }
+              const selection = await this.selectFiles(llm, choice.model, sources, log).catch(() => {
+                log('File selection failed — falling back to all sampled files.');
+                return { files: sources, tokensIn: 0, tokensOut: 0, costUsd: 0 };
+              });
+              const selected = selection.files;
+              tokensIn += selection.tokensIn;
+              tokensOut += selection.tokensOut;
+              costUsd += selection.costUsd;
 
-          const results = await Promise.allSettled(
-            batches.map((batch) => this.extractBatch(llm, choice.model, batch)),
+              const batches = outOfTime() ? [] : chunk(selected, EXTRACTION_BATCH_SIZE);
+              if (batches.length === 0) {
+                log('Out of time before extraction — keeping the config-derived rules only.');
+                return;
+              }
+              log(
+                `Extracting from ${selected.length} file(s) in ${batches.length} batch(es), ` +
+                  `${EXTRACTION_CONCURRENCY} at a time.`,
+              );
+
+              // Capped concurrency, not `Promise.allSettled` over all batches at
+              // once: MEASURED to matter (see constants.ts) — full parallelism
+              // triggered provider-side throttling severe enough that no batch
+              // settled, fulfilled or timed-out, for 10+ minutes.
+              const results = await settleWithConcurrency(
+                batches.map((batch) => () => this.extractBatch(llm, choice.model, batch)),
+                EXTRACTION_CONCURRENCY,
+              );
+              results.forEach((r, i) => {
+                if (r.status === 'fulfilled') {
+                  modelCandidates.push(...r.value.rules);
+                  tokensIn += r.value.tokensIn;
+                  tokensOut += r.value.tokensOut;
+                  costUsd += r.value.costUsd ?? 0;
+                } else {
+                  // One failed batch must not take the scan down with it.
+                  log(`Batch ${i + 1} failed: ${errMessage(r.reason)}`);
+                }
+              });
+            })(),
+            // 1, not 0: `withTimeout`'s own `if (!ms || ms <= 0) return p`
+            // guard treats a zero-length budget as "no timeout at all", racing
+            // the deadline unraced — reopening exactly the hang this backstop
+            // exists to close, right at the boundary where it matters most.
+            Math.max(1, deadline - Date.now()),
           );
-          results.forEach((r, i) => {
-            if (r.status === 'fulfilled') {
-              modelCandidates.push(...r.value.rules);
-              tokensIn += r.value.tokensIn;
-              tokensOut += r.value.tokensOut;
-              costUsd += r.value.costUsd ?? 0;
-            } else {
-              // One failed batch must not take the scan down with it.
-              log(`Batch ${i + 1} failed: ${errMessage(r.reason)}`);
-            }
-          });
+        } catch (err) {
+          log(`Model extraction did not finish in time — keeping the config-derived rules only: ${errMessage(err)}`);
         }
       } else {
         log('Repo is not indexed yet — only config-derived conventions are available.');
@@ -469,6 +516,90 @@ export class ConventionsService {
     };
   }
 
+  /** Multi-skill draft set: one draft per category, singletons merged. See `buildSkillDrafts`. */
+  async skillDrafts(
+    workspaceId: string,
+    repoId: string,
+    conventionIds?: string[],
+  ): Promise<ConventionSkillDraft[] | undefined> {
+    const repoRef = await this.repo.getRepoRef(workspaceId, repoId);
+    if (!repoRef) return undefined;
+
+    const rows =
+      conventionIds && conventionIds.length > 0
+        ? await this.repo.listByIds(workspaceId, repoId, conventionIds)
+        : await this.repo.listAccepted(workspaceId, repoId);
+
+    return buildSkillDrafts(repoRef.name, rows.map(toConventionDto));
+  }
+
+  /**
+   * Persist every draft's skill and mark all their source conventions as
+   * linked, so a later re-scan never re-proposes a rule already in a skill.
+   *
+   * The UNION of every draft's `conventionIds` is resolved in ONE query first,
+   * and the whole request is refused unless every id resolves — a partial set
+   * would silently build some skills from a different rule set than the one
+   * the author reviewed (spec: "Skill assembly").
+   */
+  async createSkills(
+    workspaceId: string,
+    repoId: string,
+    input: CreateConventionSkillsInput,
+  ): Promise<Skill[] | undefined> {
+    const allIds = [...new Set(input.drafts.flatMap((d) => d.conventionIds))];
+    const rows = await this.repo.listByIds(workspaceId, repoId, allIds);
+    if (rows.length !== allIds.length) return undefined;
+
+    const evidenceById = new Map(rows.map((r) => [r.id, r.evidencePath]));
+
+    const skills: Skill[] = [];
+    for (const draft of input.drafts) {
+      const skill = await this.container.skillsRepo.insert({
+        workspaceId,
+        name: draft.name,
+        description: draft.description,
+        type: draft.type,
+        source: SKILL_SOURCE,
+        body: draft.body,
+        enabled: draft.enabled,
+      });
+
+      await this.repo.markLinkedToSkill(workspaceId, draft.conventionIds, skill.id);
+
+      skills.push({
+        id: skill.id,
+        name: skill.name,
+        description: skill.description,
+        type: skill.type,
+        source: skill.source,
+        body: skill.body,
+        enabled: skill.enabled,
+        version: skill.version,
+        evidence_files: [
+          ...new Set(
+            draft.conventionIds.map((id) => evidenceById.get(id) ?? null).filter(isString),
+          ),
+        ],
+      });
+    }
+
+    // Agent linking happens once, after every skill in the set has been
+    // created — not per draft — so the order columns account for all of them.
+    for (const agentId of input.agentIds ?? []) {
+      // Tenancy check first — `linkSkill` is workspace-agnostic by design.
+      const agent = await this.container.agentsRepo.getById(workspaceId, agentId);
+      if (!agent) continue;
+      let order = (await this.container.agentsRepo.linkedSkills(agentId)).length;
+      for (const skill of skills) {
+        await this.container.agentsRepo.linkSkill(agentId, skill.id, order);
+        order += 1;
+      }
+    }
+
+    return skills;
+  }
+
   // ------------------------------------------------------------- internals
 
   /** Workspace override, else the registry default from `@devdigest/shared`. */
@@ -659,6 +790,31 @@ function chunk<T>(items: T[], size: number): T[][] {
   const out: T[][] = [];
   for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
   return out;
+}
+
+/**
+ * Run `tasks` with at most `limit` in flight at once, settling like
+ * `Promise.allSettled` (never rejects; each slot records fulfilled/rejected).
+ * Order of `results` matches `tasks`, not completion order.
+ */
+export async function settleWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  limit: number,
+): Promise<PromiseSettledResult<T>[]> {
+  const results: PromiseSettledResult<T>[] = new Array(tasks.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < tasks.length) {
+      const i = next++;
+      try {
+        results[i] = { status: 'fulfilled', value: await tasks[i]!() };
+      } catch (reason) {
+        results[i] = { status: 'rejected', reason };
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(limit, tasks.length) }, worker));
+  return results;
 }
 
 function numberLines(content: string): string {

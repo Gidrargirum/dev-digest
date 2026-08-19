@@ -15,6 +15,8 @@ import type {
   ConventionStatus,
   ConventionsPage,
   ConventionSkillDraft,
+  ConventionSkillDraftSet,
+  ConventionSkillsResult,
   Skill,
   SkillType,
 } from "@devdigest/shared";
@@ -100,6 +102,50 @@ export function useCreateConventionSkill() {
   return useMutation({
     mutationFn: ({ repoId, ...input }: CreateConventionSkillInput) =>
       api.post<Skill>(`/repos/${repoId}/conventions/skill`, input),
+    onSuccess: (_data, { repoId }) => {
+      qc.invalidateQueries({ queryKey: ["conventions", repoId] });
+      qc.invalidateQueries({ queryKey: ["skills"] });
+    },
+  });
+}
+
+/** One deterministic draft per (grouped) category — the multi-skill preview.
+    `enabled` gates the POST so it only fires once the create-skill modal opens. */
+export function useConventionSkillDrafts(
+  repoId: string | null | undefined,
+  conventionIds: string[],
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: ["convention-skill-drafts", repoId, conventionIds],
+    queryFn: () =>
+      api.post<ConventionSkillDraftSet>(`/repos/${repoId}/conventions/skills/preview`, {
+        convention_ids: conventionIds,
+      }),
+    enabled: enabled && !!repoId,
+  });
+}
+
+export interface CreateConventionSkillsDraftInput {
+  name: string;
+  description: string;
+  type: SkillType;
+  body: string;
+  enabled: boolean;
+  convention_ids: string[];
+}
+
+export interface CreateConventionSkillsInput {
+  repoId: string;
+  drafts: CreateConventionSkillsDraftInput[];
+  agent_ids?: string[];
+}
+
+export function useCreateConventionSkills() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ repoId, ...input }: CreateConventionSkillsInput) =>
+      api.post<ConventionSkillsResult>(`/repos/${repoId}/conventions/skills`, input),
     onSuccess: (_data, { repoId }) => {
       qc.invalidateQueries({ queryKey: ["conventions", repoId] });
       qc.invalidateQueries({ queryKey: ["skills"] });

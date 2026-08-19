@@ -264,8 +264,26 @@ export const ConventionSkillDraft = z.object({
   body: z.string(),
   evidence_files: z.array(z.string()),
   convention_ids: z.array(z.string()),
+  /**
+   * The category this draft was grouped by, or `null` when it merges several
+   * singleton categories into one general skill. Additive: the legacy
+   * singular-draft route always returns `null` here.
+   */
+  category: ConventionCategory.nullable(),
 });
 export type ConventionSkillDraft = z.infer<typeof ConventionSkillDraft>;
+
+/** One draft per (grouped) category — the multi-skill preview response. */
+export const ConventionSkillDraftSet = z.object({
+  drafts: z.array(ConventionSkillDraft),
+});
+export type ConventionSkillDraftSet = z.infer<typeof ConventionSkillDraftSet>;
+
+/** The skills actually created from a multi-draft submission. */
+export const ConventionSkillsResult = z.object({
+  skills: z.array(Skill),
+});
+export type ConventionSkillsResult = z.infer<typeof ConventionSkillsResult>;
 
 // ---- Agents ----
 // 'openrouter' routes through the OpenAI-compatible API (OpenAIProvider with a

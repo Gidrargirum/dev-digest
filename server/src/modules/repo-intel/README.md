@@ -40,7 +40,14 @@ touch the pipeline internals:
 - `getCallerSignatures(repoId, files, limit)` → callers of changed symbols.
 - `getBlastRadius(repoId, files)` → impacted symbols / callers (used by L04).
 - `getUnresolvedReferences(repoId, …)` → phantom-symbol detection (used by L06).
-- `getConventionSamples(repoId)` → top-ranked files for convention extraction (L02).
+- `getConventionSamples(repoId, n, opts?)` → **stratified** file sample for convention
+  extraction (L02): files are grouped by role (`routes` / `service` / `repository` /
+  `component` / `hook` / `other`, see `helpers.stratumFor`) and round-robined by rank
+  within each stratum, instead of taking a flat top-N. On this repo's 312 indexed
+  files, a flat top-N collapsed onto whichever 2-3 directories dominate PageRank
+  (schema files, constants, shared styling) and never sampled a route handler,
+  service, repository, or component (see `plans/conventions-extractor-v2.md`,
+  "Крок 0"). Pure code over `getRankedPaths` — no model call, no new I/O port.
 
 In the starter, only `getRepoMap` / `getFileRank` / `getCallerSignatures` are
 wired — into `modules/reviews/run-executor.ts`, which adds the repo map and a

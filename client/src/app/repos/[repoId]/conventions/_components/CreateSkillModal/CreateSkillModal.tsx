@@ -1,27 +1,19 @@
-/* CreateSkillModal — bakes the accepted convention candidates into a Skill.
-   The draft body is assembled server-side (deterministically, no model call);
-   everything shown here is editable before it is saved. */
+/* CreateSkillModal — bakes the accepted convention candidates into one or
+   more Skills, one per grouped category. The draft bodies are assembled
+   server-side (deterministically, no model call); everything shown here is
+   editable before it is saved. */
 "use client";
 
 import React from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import {
-  Button,
-  FormField,
-  Icon,
-  Modal,
-  SelectInput,
-  Skeleton,
-  TextInput,
-  Textarea,
-  Toggle,
-} from "@devdigest/ui";
-import type { SkillType } from "@devdigest/shared";
+import { Button, Checkbox, FormField, Icon, Modal, Skeleton } from "@devdigest/ui";
 import { ApiError } from "@/lib/api";
-import { useConventionSkillDraft, useCreateConventionSkill } from "@/lib/hooks/conventions";
-import { BODY_ROWS, DEFAULT_SKILL_TYPE, MODAL_WIDTH, SKILL_TYPE_VALUES } from "./constants";
-import { estimateTokens } from "./helpers";
+import { useAgents } from "@/lib/hooks/agents";
+import { useConventionSkillDrafts, useCreateConventionSkills } from "@/lib/hooks/conventions";
+import { MODAL_WIDTH } from "./constants";
+import { canSubmitForms, categoryLabel, formsFromDrafts, type DraftFormState } from "./helpers";
+import { SkillDraftFields } from "./SkillDraftFields";
 import { s } from "./styles";
 
 export function CreateSkillModal({
@@ -42,37 +34,30 @@ export function CreateSkillModal({
   // query mid-edit and swap the half-filled form for skeletons. The modal
   // edits one fixed selection; it closes to pick another.
   const [ids] = React.useState(conventionIds);
-  const { data: draft, isLoading } = useConventionSkillDraft(repoId, ids, true);
-  const create = useCreateConventionSkill();
+  const { data: draftSet, isLoading } = useConventionSkillDrafts(repoId, ids, true);
+  const { data: agents, isLoading: agentsLoading } = useAgents();
+  const create = useCreateConventionSkills();
 
-  const [name, setName] = React.useState("");
-  const [description, setDescription] = React.useState("");
-  const [type, setType] = React.useState<SkillType>(DEFAULT_SKILL_TYPE);
-  const [enabled, setEnabled] = React.useState(true);
-  const [body, setBody] = React.useState("");
+  const [forms, setForms] = React.useState<DraftFormState[]>([]);
   const [touched, setTouched] = React.useState(false);
+  const [selectedAgentIds, setSelectedAgentIds] = React.useState<string[]>([]);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
-  const enabledSwitch = React.useRef<HTMLSpanElement>(null);
 
-  // The vendored Toggle renders a bare `<button role="switch">` and forwards no
-  // props, and a wrapping <label> does not name a button — so the accessible
-  // name is attached here. vendor/ui is not ours to change.
-  const enabledLabel = t("createSkill.fields.enabled");
+  // Prefill once the draft set lands; a later refetch must not stomp on edits.
   React.useEffect(() => {
-    enabledSwitch.current?.querySelector('[role="switch"]')?.setAttribute("aria-label", enabledLabel);
-  }, [enabledLabel, isLoading]);
+    if (!draftSet || touched) return;
+    setForms(formsFromDrafts(draftSet.drafts));
+  }, [draftSet, touched]);
 
-  // Prefill once the draft lands; a later refetch must not stomp on edits.
-  React.useEffect(() => {
-    if (!draft || touched) return;
-    setName(draft.name);
-    setDescription(draft.description);
-    setBody(draft.body);
-  }, [draft, touched]);
+  const editField =
+    (index: number) =>
+    <K extends keyof DraftFormState>(key: K, value: DraftFormState[K]) => {
+      setTouched(true);
+      setForms((prev) => prev.map((f, i) => (i === index ? { ...f, [key]: value } : f)));
+    };
 
-  const edit = <T,>(setter: (v: T) => void) => (v: T) => {
-    setTouched(true);
-    setter(v);
+  const toggleAgent = (agentId: string, checked: boolean) => {
+    setSelectedAgentIds((prev) => (checked ? [...prev, agentId] : prev.filter((id) => id !== agentId)));
   };
 
   // Not an async onClick: a rejected POST would become an unhandled rejection.
@@ -81,31 +66,37 @@ export function CreateSkillModal({
     setSubmitError(null);
     void (async () => {
       try {
-        const skill = await create.mutateAsync({
+        const result = await create.mutateAsync({
           repoId,
-          name: name.trim(),
-          description,
-          type,
-          body,
-          enabled,
-          convention_ids: draft?.convention_ids ?? ids,
+          drafts: forms.map((f) => ({
+            name: f.name.trim(),
+            description: f.description,
+            type: f.type,
+            body: f.body,
+            enabled: f.enabled,
+            convention_ids: f.convention_ids,
+          })),
+          ...(selectedAgentIds.length > 0 ? { agent_ids: selectedAgentIds } : {}),
         });
         onClose();
-        router.push(`/skills/${skill.id}?tab=config`);
+        if (result.skills.length === 1) {
+          router.push(`/skills/${result.skills[0]!.id}?tab=config`);
+        } else {
+          router.push("/skills");
+        }
       } catch (err) {
         setSubmitError(err instanceof ApiError ? err.message : t("createSkill.error"));
       }
     })();
   };
 
-  const typeOptions = SKILL_TYPE_VALUES.map((v) => ({ value: v, label: t(`createSkill.type.${v}`) }));
-  const canSubmit = name.trim().length > 0 && body.trim().length > 0 && !create.isPending && !isLoading;
+  const canSubmit = canSubmitForms(forms) && !create.isPending && !isLoading;
 
   return (
     <Modal
       width={MODAL_WIDTH}
       title={t("createSkill.title")}
-      subtitle={draft?.name ?? t("createSkill.loading")}
+      subtitle={isLoading ? t("createSkill.loading") : t("createSkill.subtitleReady", { count: forms.length })}
       onClose={onClose}
       footer={
         <div style={s.footer}>
@@ -136,47 +127,35 @@ export function CreateSkillModal({
                 {submitError}
               </div>
             )}
-            <FormField label={t("createSkill.fields.name")} required>
-              <TextInput
-                value={name}
-                onChange={edit(setName)}
-                placeholder={t("createSkill.fields.namePlaceholder")}
+            {forms.map((f, i) => (
+              // One draft per (grouped) category — the category is a stable,
+              // unique key across the set (`buildSkillDrafts` emits at most
+              // one `category: null` merge draft), unlike the array index.
+              <SkillDraftFields
+                key={f.category ?? "general"}
+                categoryLabel={categoryLabel(f.category, t)}
+                value={f}
+                onChange={editField(i)}
               />
+            ))}
+            <FormField label={t("createSkill.agents.label")} hint={t("createSkill.agents.hint")}>
+              {agentsLoading ? (
+                <Skeleton height={64} />
+              ) : agents && agents.length > 0 ? (
+                <div style={s.agentsList}>
+                  {agents.map((agent) => (
+                    <Checkbox
+                      key={agent.id}
+                      checked={selectedAgentIds.includes(agent.id)}
+                      onChange={(v) => toggleAgent(agent.id, v)}
+                      label={<span>{agent.name}</span>}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <span style={s.agentsEmpty}>{t("createSkill.agents.empty")}</span>
+              )}
             </FormField>
-            <FormField label={t("createSkill.fields.description")}>
-              <TextInput
-                value={description}
-                onChange={edit(setDescription)}
-                placeholder={t("createSkill.fields.descriptionPlaceholder")}
-              />
-            </FormField>
-            <FormField
-              label={t("createSkill.fields.type")}
-              right={
-                <span style={s.enabledLabel}>
-                  {enabledLabel}
-                  <span ref={enabledSwitch} style={s.enabledSwitch}>
-                    <Toggle on={enabled} onChange={setEnabled} size={14} />
-                  </span>
-                </span>
-              }
-            >
-              <SelectInput
-                value={type}
-                onChange={(v) => setType(v as SkillType)}
-                options={typeOptions}
-              />
-            </FormField>
-            <FormField
-              label={t("createSkill.fields.body")}
-              hint={t("createSkill.fields.bodyHint")}
-              required
-            >
-              <Textarea value={body} onChange={edit(setBody)} rows={BODY_ROWS} mono />
-            </FormField>
-            <div style={s.tokenEstimate}>
-              {t("createSkill.tokenEstimate", { count: estimateTokens(body) })}
-            </div>
           </>
         )}
       </div>

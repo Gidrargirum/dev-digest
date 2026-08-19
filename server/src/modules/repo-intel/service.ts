@@ -29,6 +29,7 @@ import {
 import { readFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { RepoIntelRepository, type FullSymbolRow } from './repository.js';
+import { isJunkPath, stratifiedSample } from './helpers.js';
 import type {
   BlastCallerRow,
   BlastChangedSymbol,
@@ -630,9 +631,31 @@ export class RepoIntelService implements RepoIntel {
     return out;
   }
 
-  /** Top-N files by rank, minus tests/configs/migrations — conventions sample. */
-  async getConventionSamples(repoId: string, n: number): Promise<string[]> {
-    return this.getTopFilesByRank(repoId, n);
+  /**
+   * Conventions sample (L02), STRATIFIED — not a flat top-N. A flat top-N by
+   * rank collapses onto whatever a handful of directories dominate PageRank
+   * with (schema files, constants, shared styling — measured on this repo,
+   * see plan "Крок 0": 12/12 files came from 3 directories, zero route
+   * handlers, services or components). Grouping by `stratumFor` and
+   * round-robining across strata (see `helpers.stratifiedSample`) spreads the
+   * sample across the actual shapes of the codebase instead.
+   *
+   * Pure code over `repo.getRankedPaths` — no model call, no new I/O port
+   * (per `specs/conventions-extractor.md`, "Sampling" §1). `opts.strata` is
+   * accepted for forward-compat callers that want to reason about the stratum
+   * count; the current selection (round-robin over however many strata exist
+   * in the ranked set) already adapts to it without needing the value.
+   */
+  async getConventionSamples(
+    repoId: string,
+    n: number,
+    opts?: { strata?: number },
+  ): Promise<string[]> {
+    void opts;
+    if (!this.deps.config.repoIntelEnabled) return [];
+    if (n <= 0) return [];
+    const rows = await this.repo.getRankedPaths(repoId, Math.max(n * 10, 100));
+    return stratifiedSample(rows, n);
   }
 
   /**
@@ -708,33 +731,6 @@ export class RepoIntelService implements RepoIntel {
 
 /** How many top-ranked files seed `getCriticalPaths` dependency chains. */
 const CRITICAL_PATH_ROOTS = 5;
-
-/**
- * Path kinds excluded from rank-driven file samples (conventions/onboarding):
- * tests, configs, declaration files, migrations, generated dirs. Substring
- * match on the repo-relative path (kept deliberately simple + deterministic).
- */
-const JUNK_PATH_PATTERNS = [
-  '.test.',
-  '.spec.',
-  '.d.ts',
-  '__tests__/',
-  '__mocks__/',
-  '/test/',
-  '/tests/',
-  '/migrations/',
-  '/__fixtures__/',
-  '.config.',
-  'vitest.',
-  'jest.',
-  'eslint',
-  'prettier',
-] as const;
-
-function isJunkPath(path: string): boolean {
-  const lower = path.toLowerCase();
-  return JUNK_PATH_PATTERNS.some((p) => lower.includes(p));
-}
 
 /** Enclosing top-level (bare-name) symbol for a line, from persistent rows. */
 function enclosingFromRows(rows: FullSymbolRow[], line: number): string | null {
