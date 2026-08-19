@@ -14,6 +14,8 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
+import { readDiffMode } from "./_components/DiffTab/helpers";
+import type { DiffMode } from "./_components/DiffTab/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "@/lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
@@ -65,12 +67,23 @@ export default function PRDetailPage() {
 
   const tab = search.get("tab") ?? "overview";
   const traceRunId = search.get("trace");
-  const setParam = (key: string, val: string | null) => {
+  const targetFindingId = search.get("finding");
+  const diffMode: DiffMode = readDiffMode(search.get("diffMode"));
+  // Batches every param update into ONE URLSearchParams + ONE router.replace.
+  // `search` is a snapshot of the current render, so two sequential single-
+  // param `setParam` calls in the same handler would build from the same
+  // stale snapshot and overwrite each other (e.g. tab=findings then
+  // finding=<id> in the same click) — any multi-param navigation MUST go
+  // through this, not two setParam calls back to back.
+  const setParams = (entries: Array<[string, string | null]>) => {
     const sp = new URLSearchParams(search.toString());
-    if (val == null) sp.delete(key);
-    else sp.set(key, val);
+    for (const [key, val] of entries) {
+      if (val == null) sp.delete(key);
+      else sp.set(key, val);
+    }
     router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
   };
+  const setParam = (key: string, val: string | null) => setParams([[key, val]]);
   const setTab = (t: string) => setParam("tab", t);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
@@ -153,6 +166,7 @@ export default function PRDetailPage() {
             prCommits={pr.commits}
             repoFullName={repoFullName}
             headSha={pr.head_sha}
+            targetFindingId={targetFindingId}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {
@@ -173,7 +187,11 @@ export default function PRDetailPage() {
             prId={prId}
             filesCount={pr.files_count}
             files={pr.files}
+            reviews={runs}
             canComment={pr.status === "open"}
+            diffMode={diffMode}
+            onSetDiffMode={(mode) => setParam("diffMode", mode === "smart" ? "smart" : null)}
+            onOpenFinding={(id) => setParams([["tab", "findings"], ["finding", id], ["diffMode", null]])}
           />
         )}
       </div>

@@ -4,21 +4,29 @@
 
 import React from "react";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
+import { type DiffAnnotationApi, type DiffFindingMark } from "../annotations";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
+import { FindingMarks } from "../FindingMarks";
 
 export function CodeLine({
   ln,
   path,
   threads,
   commenting,
+  marks,
+  annotations,
 }: {
   ln: Line;
   path: string;
   threads: CommentThread[];
   commenting?: DiffCommentApi;
+  /** Smart Diff finding marks anchored to this line (empty when
+   *  `annotations` is undefined — plain diff mode is unaffected). */
+  marks?: DiffFindingMark[];
+  annotations?: DiffAnnotationApi;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -69,6 +77,10 @@ export function CodeLine({
         threads.map((th) => (
           <CommentThreadView key={th.rootId} thread={th} commenting={commenting} path={path} />
         ))}
+
+      {annotations && marks && marks.length > 0 && (
+        <FindingMarks marks={marks} onOpenFinding={annotations.onOpenFinding} />
+      )}
 
       {commenting && composing && target && (
         <InlineComposer

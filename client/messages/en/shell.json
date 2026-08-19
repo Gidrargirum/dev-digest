@@ -40,6 +40,18 @@
     "reply": "Reply",
     "viewOnGitHub": "View on GitHub",
     "postedToGitHub": "Posts to GitHub immediately",
-    "outdatedTitle": "{count} comment(s) on older revisions"
+    "outdatedTitle": "{count} comment(s) on older revisions",
+    "unanchoredTitle": "{count} finding(s) not shown on a diff line",
+    "largeBadge": "LARGE · {lines} lines"
+  },
+  "smartDiff": {
+    "normalMode": "Normal",
+    "smartMode": "Smart Diff",
+    "filesSummary": "Files changed · {count} files",
+    "smartFilesSummary": "Files changed · {count} files touched · +{additions} −{deletions}",
+    "groupCore": "Core logic",
+    "groupWiring": "Wiring",
+    "groupBoilerplate": "Boilerplate",
+    "groupSummary": "{files} files · +{additions} −{deletions} · {findings} findings"
   }
 }

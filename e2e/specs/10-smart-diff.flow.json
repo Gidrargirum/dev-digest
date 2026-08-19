@@ -1,0 +1,141 @@
+{
+  "name": "Smart Diff groups the seeded PR and deep-links a finding from an unanchored chip",
+  "description": "From PR #482, open the Files changed tab (defaults to Normal — no findings visible), switch to Smart Diff, confirm the Core logic / Boilerplate group headers render, then click the seeded finding chip. Every seeded pr_files row has `patch = NULL` (seed.ts), so the finding on src/config.ts has no rendered diff line and surfaces in FileCard's 'unanchored findings' fallback instead of on line 12 — same click, same onOpenFinding handler as an anchored chip. The click deep-links to the Agent runs tab with the finding's card expanded (requirement 4). Read-only seeded data (no model call). Assumes a freshly-seeded DB (see e2e/README.md).",
+  "steps": [
+    {
+      "cmd": [
+        "open",
+        "{BASE}/"
+      ],
+      "label": "load the app root"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls"
+      ],
+      "label": "land on the PR list"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Add rate limiting to public API endpoints"
+      ],
+      "label": "seeded PR title row is visible"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Add rate limiting to public API endpoints",
+        "click"
+      ],
+      "label": "open the PR row"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "/pulls/482"
+      ],
+      "label": "navigate to the PR detail route"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "PR detail data settles"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Files changed"
+      ],
+      "label": "switch to the Files changed tab"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "tab=diff"
+      ],
+      "label": "diff tab is active in the URL"
+    },
+    {
+      "cmd": [
+        "find",
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Smart Diff"
+      ],
+      "label": "switch to Smart Diff mode"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "diffMode=smart"
+      ],
+      "label": "smart mode is active in the URL"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "CORE LOGIC"
+      ],
+      "label": "Core logic group header renders (uppercase-styled)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "BOILERPLATE"
+      ],
+      "label": "Boilerplate group header renders, even collapsed (uppercase-styled)"
+    },
+    {
+      "cmd": [
+        "find",
+        "text",
+        "Hardcoded Stripe secret key in commit",
+        "click"
+      ],
+      "label": "click the seeded finding's unanchored chip on src/config.ts"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "tab=findings"
+      ],
+      "label": "deep-link navigated to the Agent runs tab"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--url",
+        "finding="
+      ],
+      "label": "the finding id is carried in the URL"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "sk_live_"
+      ],
+      "label": "the finding's card is expanded (rationale text visible)"
+    }
+  ]
+}
