@@ -1,4 +1,9 @@
 import type { FindingActionKind } from "@devdigest/shared";
+import type { Severity } from "@devdigest/ui";
+
+/** Severities offered as filter chips, worst first — the same order the list
+ *  is sorted in, so the chips read as a legend for what is below them. */
+export const FILTERABLE_SEVERITIES: Severity[] = ["CRITICAL", "WARNING", "SUGGESTION"];
 
 /** Sort weight per severity (lower = shown first). */
 export const SEVERITY_ORDER: Record<string, number> = {

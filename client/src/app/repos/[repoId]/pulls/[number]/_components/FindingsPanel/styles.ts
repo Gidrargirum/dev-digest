@@ -15,6 +15,23 @@ export const s = {
     background: "var(--border)",
     margin: "0 2px",
   } satisfies CSSProperties,
+  /** A filter chip.  is carried by background + border + ,
+   *  never by colour alone — the severity icon and the count stay identical in
+   *  both states. */
+  chip: (color: string, bg: string, active: boolean): CSSProperties => ({
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "4px 12px",
+    borderRadius: 999,
+    border: `1px solid ${active ? color : "var(--border)"}`,
+    background: active ? bg : "transparent",
+    color: active ? color : "var(--text-secondary)",
+    fontSize: 12.5,
+    fontWeight: 600,
+    cursor: "pointer",
+    lineHeight: 1.4,
+  }),
   toggleGroup: {
     marginLeft: "auto",
     display: "flex",

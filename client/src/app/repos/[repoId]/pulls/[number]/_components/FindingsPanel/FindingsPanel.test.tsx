@@ -76,6 +76,63 @@ describe("FindingsPanel (smoke)", () => {
   });
 });
 
+describe("FindingsPanel — severity filter chips", () => {
+  it("renders one chip per present severity, with its count, and none for absent ones", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS_WITH_LOW} prId="pr1" />);
+
+    expect(screen.getByRole("button", { name: /Critical/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Suggestion/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Warning/ })).not.toBeInTheDocument();
+  });
+
+  it("filters the list to one severity, and clicking the active chip clears it", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS_WITH_LOW} prId="pr1" />);
+    const critical = screen.getByRole("button", { name: /Critical/ });
+
+    fireEvent.click(critical);
+    expect(critical).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Hardcoded secret")).toBeInTheDocument();
+    expect(screen.queryByText("Low-confidence nit")).not.toBeInTheDocument();
+
+    fireEvent.click(critical);
+    expect(critical).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByText("Low-confidence nit")).toBeInTheDocument();
+  });
+
+  it("counts what the chip will actually show, so hideLow drops the chip it empties", () => {
+    renderWithIntl(<FindingsPanel findings={FINDINGS_WITH_LOW} prId="pr1" />);
+    expect(screen.getByRole("button", { name: /Suggestion/ })).toBeInTheDocument();
+
+    // The only SUGGESTION is low-confidence, so hiding those leaves it with
+    // nothing to filter to — a chip promising "1" that opens an empty list.
+    fireEvent.click(screen.getByRole("switch"));
+    expect(screen.queryByRole("button", { name: /Suggestion/ })).not.toBeInTheDocument();
+  });
+
+  it("clears an active severity filter when a deep link targets another severity", () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const { rerender } = renderWithIntl(
+      <FindingsPanel findings={FINDINGS_WITH_LOW} prId="pr1" targetNonce={0} />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Critical/ }));
+    expect(screen.queryByText("Low-confidence nit")).not.toBeInTheDocument();
+
+    rerender(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+        <FindingsPanel
+          findings={FINDINGS_WITH_LOW}
+          prId="pr1"
+          targetFindingId="f2"
+          targetNonce={1}
+        />
+      </NextIntlClientProvider>,
+    );
+
+    expect(screen.getByText("Low-confidence nit")).toBeInTheDocument();
+  });
+});
+
 describe("FindingsPanel — deep-link focus (?finding=<id>)", () => {
   beforeEach(() => {
     Element.prototype.scrollIntoView = vi.fn();
