@@ -1,6 +1,16 @@
 /** Pure helpers for the DiffViewer. */
 import { HUNK_HEADER_RE } from "./constants";
 
+/** Whether a file's total changed lines exceed `threshold`. Used by
+ *  FileCard's Smart Diff "LARGE" badge (only rendered when `annotations` is
+ *  present — see ./annotations.ts). */
+export function isLargeFile(
+  file: { additions?: number | null; deletions?: number | null },
+  threshold: number,
+): boolean {
+  return (file.additions ?? 0) + (file.deletions ?? 0) > threshold;
+}
+
 export interface Line {
   kind: "add" | "del" | "ctx" | "hunk";
   text: string;

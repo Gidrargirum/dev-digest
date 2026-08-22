@@ -6,7 +6,7 @@ import type {
   ConventionSkillDraft,
 } from '@devdigest/shared';
 import type { ConventionRow, ConventionScanRow } from '../../db/rows.js';
-import { MAX_CANDIDATES_PER_CATEGORY } from './constants.js';
+import { MAX_CANDIDATES_PER_CATEGORY, SKILL_CATEGORY_MIN_CANDIDATES } from './constants.js';
 
 /**
  * Pure helpers for the conventions extractor. NO I/O lives here — the file
@@ -316,8 +316,13 @@ export function slugify(text: string): string {
     .slice(0, 48);
 }
 
-export function skillNameFor(repoName: string): string {
-  return `${slugify(repoName)}-conventions`;
+/**
+ * `<repo>-<category>-conventions` when a category is given, else the legacy
+ * merged `<repo>-conventions` — the same name a `category: null` draft uses.
+ */
+export function skillNameFor(repoName: string, category?: ConventionCategory | null): string {
+  const suffix = category ? `-${category}` : '';
+  return `${slugify(repoName)}${suffix}-conventions`;
 }
 
 /** Language hint for the fenced snippet, from the evidence file's extension. */
@@ -353,11 +358,19 @@ export interface SkillBodyInput {
  * in code. Deliberately NOT a model call: the user already approved this exact
  * text, and a model rewrite would silently reintroduce claims they rejected.
  */
-export function buildSkillMarkdown(repoName: string, accepted: SkillBodyInput[]): string {
+export function buildSkillMarkdown(
+  repoName: string,
+  accepted: SkillBodyInput[],
+  category?: ConventionCategory | null,
+): string {
+  // The H1 must match the skill's own name: a `<repo>-naming-conventions` skill
+  // whose body opens with `# <repo>-conventions` reads as the wrong file, and
+  // every per-category skill would carry an identical heading.
+  const scope = category ? `${category} conventions` : 'House conventions';
   const parts: string[] = [
-    `# ${skillNameFor(repoName)}`,
+    `# ${skillNameFor(repoName, category)}`,
     '',
-    `House conventions for \`${repoName}\`. Flag changes that violate any rule below and cite the offending \`file:line\`.`,
+    `${scope} for \`${repoName}\`. Flag changes that violate any rule below and cite the offending \`file:line\`.`,
   ];
 
   for (const c of accepted) {
@@ -381,6 +394,11 @@ export function buildSkillMarkdown(repoName: string, accepted: SkillBodyInput[])
   return parts.join('\n') + '\n';
 }
 
+/**
+ * The legacy single-skill draft: everything accepted, merged into one skill
+ * regardless of category. Kept for the singular route; `category` is always
+ * `null` here since nothing was grouped.
+ */
 export function buildSkillDraft(
   repoName: string,
   accepted: (SkillBodyInput & { id: string })[],
@@ -391,7 +409,61 @@ export function buildSkillDraft(
     body: buildSkillMarkdown(repoName, accepted),
     evidence_files: [...new Set(accepted.map((c) => c.evidence_path))],
     convention_ids: accepted.map((c) => c.id),
+    category: null,
   };
+}
+
+/**
+ * Group accepted candidates into one draft per category, PROVIDED the
+ * category has at least `SKILL_CATEGORY_MIN_CANDIDATES` accepted candidates.
+ * Categories under that threshold merge into a single general
+ * `<repo>-conventions` draft (`category: null`) instead of each getting a
+ * skill of its own accepted candidate.
+ *
+ * Drafts are returned sorted by descending max confidence within the group,
+ * so the most-corroborated category leads.
+ */
+export function buildSkillDrafts(
+  repoName: string,
+  accepted: (SkillBodyInput & { id: string; category: ConventionCategory; confidence: number })[],
+): ConventionSkillDraft[] {
+  if (accepted.length === 0) return [];
+
+  const byCategory = new Map<ConventionCategory, typeof accepted>();
+  for (const c of accepted) {
+    const list = byCategory.get(c.category);
+    if (list) list.push(c);
+    else byCategory.set(c.category, [c]);
+  }
+
+  const groups: { category: ConventionCategory | null; items: typeof accepted }[] = [];
+  const merged: typeof accepted = [];
+
+  for (const items of byCategory.values()) {
+    if (items.length >= SKILL_CATEGORY_MIN_CANDIDATES) {
+      groups.push({ category: items[0]!.category, items });
+    } else {
+      merged.push(...items);
+    }
+  }
+  if (merged.length > 0) {
+    groups.push({ category: null, items: merged });
+  }
+
+  return groups
+    .map((group) => ({
+      group,
+      maxConfidence: Math.max(...group.items.map((c) => c.confidence)),
+    }))
+    .sort((a, b) => b.maxConfidence - a.maxConfidence)
+    .map(({ group: { category, items } }) => ({
+      name: skillNameFor(repoName, category),
+      description: `${items.length} house convention${items.length === 1 ? '' : 's'} extracted from ${repoName}`,
+      body: buildSkillMarkdown(repoName, items, category),
+      evidence_files: [...new Set(items.map((c) => c.evidence_path))],
+      convention_ids: items.map((c) => c.id),
+      category,
+    }));
 }
 
 // -------------------------------------------------------------------- DTOs

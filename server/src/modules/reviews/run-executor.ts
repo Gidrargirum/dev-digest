@@ -35,6 +35,22 @@ export type RunOutcome = {
 };
 
 /**
+ * Outcome of the one-per-run-set intent step (plans/intent-layer.md §3/§8).
+ * Built once in `executeRuns`, then handed to every `runOneAgent` call so
+ * each run's trace carries the same `tool_calls` entry — only cost
+ * attribution differs (first job, cache-miss only).
+ */
+interface IntentStepResult {
+  /** Rendered intent text for the prompt slot; `undefined` on failure. */
+  text: string | undefined;
+  meta: 'computed' | 'cached' | 'failed';
+  providerModel: string;
+  ms: number;
+  /** Present only when an LLM call actually happened (cache miss, success). */
+  usage?: { tokensIn: number; tokensOut: number; costUsd: number | null };
+}
+
+/**
  * Owns the background execution of queued agent runs (extracted from
  * ReviewService; behaviour unchanged). Loads the diff + intent once, then
  * map-reduces each agent, streaming events over the runBus and persisting each
@@ -105,6 +121,17 @@ export class ReviewRunExecutor {
     }
     runLog.info(`Diff ready — ${diff.files.length} changed file(s); starting ${jobs.length} agent run(s)`);
 
+    // Nothing queued (e.g. `all: true` with no enabled agents) — jobs[0]
+    // below would have nothing to fall back to, and the loop is a no-op anyway.
+    if (jobs.length === 0) return;
+
+    // ONE intent step per set of runs (decision #2, plans/intent-layer.md §3):
+    // cache-keyed on (pr_id, head_sha), never a blocking dependency — any
+    // failure degrades to "no intent section" and the review proceeds.
+    const intentStep = await this.buildIntentStep(workspaceId, pull, repo, diff, jobs, runLog);
+    // `jobs.length === 0` returned above, so `jobs[0]` is defined.
+    const firstRunId = jobs[0]!.runId;
+
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
       logger?.info(
@@ -112,7 +139,17 @@ export class ReviewRunExecutor {
         `review: agent "${agent.name}" started (${agent.provider}/${agent.model})`,
       );
       try {
-        const outcome = await this.runOneAgent(workspaceId, pull, repo, diff, agent, runId, runLog);
+        const outcome = await this.runOneAgent(
+          workspaceId,
+          pull,
+          repo,
+          diff,
+          agent,
+          runId,
+          runLog,
+          intentStep,
+          runId === firstRunId,
+        );
         logger?.info(
           {
             runId,
@@ -144,6 +181,8 @@ export class ReviewRunExecutor {
     agent: AgentRow,
     runId: string,
     parentLog: RunLogger,
+    intentStep: IntentStepResult,
+    isFirstRun: boolean,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -210,6 +249,10 @@ export class ReviewRunExecutor {
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
+        // Derived PR intent (decision #3, plans/intent-layer.md §1) — CONTEXT
+        // only, never a findings category or a score/verdict input. Omitted
+        // on cache miss-that-failed, same omit-when-empty contract as above.
+        ...(intentStep.text ? { intent: intentStep.text } : {}),
         task,
         sessionId: `${repo.owner}/${repo.name}#${pull.number}:${agent.name}`,
         onEvent: (e) => runLog.event(e.kind, e.msg, e.data),
@@ -218,6 +261,36 @@ export class ReviewRunExecutor {
         },
       });
       const { tokensIn, tokensOut, costUsd, grounding } = outcome;
+
+      // ---- Intent cost attribution (plans/intent-layer.md §8) ---------------
+      // The intent call happens ONCE per set of runs, so its tokens/cost are
+      // charged to the FIRST queued run only, and only when it actually ran an
+      // LLM call this round (cache hit / failure ⇒ zero, everywhere).
+      const intentUsage = isFirstRun ? intentStep.usage : undefined;
+      const attributedTokensIn = tokensIn + (intentUsage?.tokensIn ?? 0);
+      const attributedTokensOut = tokensOut + (intentUsage?.tokensOut ?? 0);
+      // An unknown intent cost (`estimateCost` → null, surfaced as
+      // `cost:unknown` in the tool_calls entry below) must NEVER destroy the
+      // run's own, known `costUsd` — it is simply not added (specs/pr-intent-
+      // layer.md "Cost attribution"). Sum only when both sides are known; fall
+      // back to whichever single side is known; `null` only when both are.
+      const attributedCostUsd =
+        intentUsage?.costUsd == null
+          ? costUsd
+          : costUsd == null
+            ? intentUsage.costUsd
+            : costUsd + intentUsage.costUsd;
+
+      // One `tool_calls` entry per run regardless of job index (§8) — only the
+      // cost attribution above differs by job. `cost:unknown` makes a priced
+      // gap visible instead of silently dropping it (estimateCost → null).
+      const intentCostUnknown = intentStep.meta === 'computed' && intentStep.usage?.costUsd == null;
+      const intentToolCall = {
+        tool: 'intent',
+        args: intentStep.providerModel,
+        meta: intentCostUnknown ? `${intentStep.meta};cost:unknown` : intentStep.meta,
+        ms: intentStep.ms,
+      };
 
       const keptFindings = outcome.review.findings;
 
@@ -250,9 +323,9 @@ export class ReviewRunExecutor {
       await this.repo.completeAgentRun(runId, {
         status: 'done',
         durationMs,
-        tokensIn,
-        tokensOut,
-        costUsd,
+        tokensIn: attributedTokensIn,
+        tokensOut: attributedTokensOut,
+        costUsd: attributedCostUsd,
         findingsCount: findingRows.length,
         grounding,
         score: outcome.review.score,
@@ -271,19 +344,22 @@ export class ReviewRunExecutor {
         },
         stats: {
           duration_ms: durationMs,
-          tokens_in: tokensIn,
-          tokens_out: tokensOut,
-          cost_usd: costUsd,
+          tokens_in: attributedTokensIn,
+          tokens_out: attributedTokensOut,
+          cost_usd: attributedCostUsd,
           findings: findingRows.length,
           grounding,
         },
         prompt_assembly: outcome.assembly,
-        tool_calls: outcome.chunks.map((c) => ({
-          tool: 'review_file',
-          args: c.label,
-          meta: outcome.mode,
-          ms: Math.round(durationMs / Math.max(outcome.chunks.length, 1)),
-        })),
+        tool_calls: [
+          intentToolCall,
+          ...outcome.chunks.map((c) => ({
+            tool: 'review_file',
+            args: c.label,
+            meta: outcome.mode,
+            ms: Math.round(durationMs / Math.max(outcome.chunks.length, 1)),
+          })),
+        ],
         raw_output: outcome.raw,
         memory_pulled: [],
         specs_read: [],
@@ -303,13 +379,20 @@ export class ReviewRunExecutor {
       const status = cancelled ? 'cancelled' : 'failed';
       const msg = cancelled ? 'Cancelled by user' : (err as Error).message;
       runLog.error(cancelled ? 'Run cancelled by user' : `Run failed: ${msg}`);
+      // The intent call already happened (or was attempted) before this run's
+      // own work started. If THIS run is the one job.length attribution
+      // target (first job, cache miss) and it then fails, its intent
+      // tokens/cost would otherwise be lost forever — no other run picks them
+      // up. Attribute them here too, still exactly once (specs/pr-intent-
+      // layer.md "Cost attribution": "attributed to exactly one run").
+      const intentUsage = isFirstRun ? intentStep.usage : undefined;
       await this.repo
         .completeAgentRun(runId, {
           status,
           durationMs: Date.now() - start,
-          tokensIn: 0,
-          tokensOut: 0,
-          costUsd: null,
+          tokensIn: intentUsage?.tokensIn ?? 0,
+          tokensOut: intentUsage?.tokensOut ?? 0,
+          costUsd: intentUsage?.costUsd ?? null,
           findingsCount: 0,
           grounding: '0/0 passed',
           error: msg,
@@ -320,6 +403,68 @@ export class ReviewRunExecutor {
         .catch(() => undefined);
       this.container.runBus.complete(runId);
       throw err;
+    }
+  }
+
+  /**
+   * Derive (or reuse the cached) PR intent — ONCE per set of queued runs, via
+   * `container.intent` (modules/intent/service.ts). Never a blocking
+   * dependency (plans/intent-layer.md §3): any failure is logged and the
+   * review proceeds with the `intent` prompt slot simply omitted, exactly
+   * like `callers`/`repoMap` above.
+   *
+   * `runLog.step()` is deliberately NOT used here — it logs a failure at
+   * 'error' kind, which would make the Live Log look like the RUN failed. An
+   * intent failure never fails the run, so it is logged at 'info' (same
+   * severity `buildCallersDigest`/`buildRepoMapDigest` use for their own
+   * best-effort failures below).
+   */
+  private async buildIntentStep(
+    workspaceId: string,
+    pull: PullRow,
+    repo: typeof schema.repos.$inferSelect,
+    diff: UnifiedDiff,
+    jobs: { agent: AgentRow; runId: string }[],
+    runLog: RunLogger,
+  ): Promise<IntentStepResult> {
+    // Called only with a non-empty `jobs` (guarded by the `jobs.length === 0`
+    // early return in `executeRuns`).
+    const firstAgent = jobs[0]!.agent;
+    const fallbackModel = { provider: firstAgent.provider as Provider, model: firstAgent.model };
+    const t0 = Date.now();
+    runLog.event('tool', 'Deriving PR intent…');
+    try {
+      const result = await this.container.intent.resolveForRun({
+        workspaceId,
+        pull: {
+          id: pull.id,
+          number: pull.number,
+          title: pull.title,
+          body: pull.body,
+          branch: pull.branch,
+          headSha: pull.headSha,
+        },
+        repoRef: { owner: repo.owner, name: repo.name },
+        changedFiles: diff.files.map((f) => f.path),
+        fallbackModel,
+      });
+      const ms = Date.now() - t0;
+      const providerModel = `${result.modelChoice.provider}/${result.modelChoice.model}`;
+      if (result.cacheHit) {
+        runLog.info(`Intent reused from cache (head ${pull.headSha.slice(0, 7)})`);
+        return { text: result.text, meta: 'cached', providerModel, ms };
+      }
+      runLog.event('tool', `Deriving PR intent done (${ms}ms)`);
+      return { text: result.text, meta: 'computed', providerModel, ms, usage: result.usage };
+    } catch (err) {
+      const ms = Date.now() - t0;
+      runLog.info(`Intent step failed: ${(err as Error).message}`);
+      return {
+        text: undefined,
+        meta: 'failed',
+        providerModel: `${fallbackModel.provider}/${fallbackModel.model}`,
+        ms,
+      };
     }
   }
 

@@ -5,11 +5,24 @@ import type { Line } from "./helpers";
 export const s = {
   list: { display: "flex", flexDirection: "column", gap: 10 } satisfies CSSProperties,
   empty: { padding: "24px", fontSize: 14, color: "var(--text-muted)", textAlign: "center" } satisfies CSSProperties,
+  // All-longhand border (never mixed with the `border` shorthand — Smart
+  // Diff's `fileCardLarge` overrides only borderLeft*, and mixing shorthand
+  // with a longhand override across renders makes React warn).
   fileCard: {
-    border: "1px solid var(--border)",
+    borderStyle: "solid",
+    borderColor: "var(--border)",
+    borderWidth: 1,
+    borderLeftWidth: 1,
+    borderLeftColor: "var(--border)",
     borderRadius: 7,
     overflow: "hidden",
     background: "var(--bg-elevated)",
+  } satisfies CSSProperties,
+  /** Smart Diff's "LARGE" indicator — accent left border; the badge text +
+   *  icon (not color alone) carries the meaning, per WCAG AA. */
+  fileCardLarge: {
+    borderLeftWidth: 3,
+    borderLeftColor: "var(--warn)",
   } satisfies CSSProperties,
   fileHeader: {
     display: "flex",

@@ -1,8 +1,16 @@
 # modules/conventions — Conventions Extractor
 
 Turns a repository into a reviewed list of house conventions, and the accepted
-ones into a single skill. Requirements live in
+ones into skills. Requirements live in
 [specs/conventions-extractor.md](../../../../specs/conventions-extractor.md).
+
+Two skill-assembly routes coexist: the legacy singular one
+(`…/skill{,/preview}`) always merges everything into one skill; the plural one
+(`…/skills{,/preview}`) groups accepted candidates by category via
+`buildSkillDrafts` — a category earns its own `<repo>-<category>-conventions`
+skill only once it has `SKILL_CATEGORY_MIN_CANDIDATES` (2) accepted
+candidates, otherwise it folds into the general `<repo>-conventions` skill.
+The singular routes are additive-only for now; a later step removes them.
 
 ## Pipeline
 

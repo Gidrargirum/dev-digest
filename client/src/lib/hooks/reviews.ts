@@ -8,6 +8,7 @@ import { api, API_BASE } from "../api";
 import { notify } from "../toast";
 import type {
   FindingActionKind,
+  PrIntentResponse,
   PrReviewComment,
   ReviewRecord,
   ReviewRunResponse,
@@ -55,6 +56,23 @@ export function usePrReviews(prId: string | null | undefined) {
   return useQuery({
     queryKey: ["reviews", prId],
     queryFn: () => api.get<ReviewRecord[]>(`/pulls/${prId}/reviews`),
+    enabled: !!prId,
+  });
+}
+
+/** Derived PR intent (title/body/branch/linked-issue based), computed once at
+   review-run time and cached by head_sha — `null` when not yet computed. */
+export function usePrIntent(prId: string | null | undefined) {
+  return useQuery({
+    queryKey: ["pr-intent", prId],
+    queryFn: async () => {
+      // No cast: `PrIntentResponse.intent` is already `PrIntentRecord | null`,
+      // and the payload is validated server-side against the same contract
+      // (`modules/intent/repository.ts`) — the client can only import TYPES
+      // from the vendored package, so it cannot parse it a second time here.
+      const res = await api.get<PrIntentResponse>(`/pulls/${prId}/intent`);
+      return res.intent;
+    },
     enabled: !!prId,
   });
 }

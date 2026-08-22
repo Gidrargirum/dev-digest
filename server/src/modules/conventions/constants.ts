@@ -1,8 +1,37 @@
 /** Job kind registered on the JobRunner for a repo-wide extraction. */
 export const EXTRACT_JOB_KIND = 'conventions-extract';
 
-/** How many ranked source files repo-intel is asked for. */
-export const SAMPLE_FILE_LIMIT = 12;
+/**
+ * How many ranked source files repo-intel is asked for. Raised from 12 to 24
+ * (plan "Крок 5" — flat top-12 on this repo's 312 indexed files came from 3
+ * directories, zero route handlers/services/components; stratified sampling
+ * over `getConventionSamples` needs headroom across more strata to actually
+ * spread across the codebase's shapes).
+ *
+ * Budget at 24: `EXTRACTION_BATCH_SIZE=4` → 6 batches. Fully parallel
+ * (`Promise.allSettled` over all 6 at once) was tried first and MEASURED to
+ * hang indefinitely on a real scan — 6 simultaneous requests to the provider
+ * never settled within `EXTRACTION_TIMEOUT_MS` each, with zero batch-failure
+ * events for 10+ minutes. `EXTRACTION_CONCURRENCY` below caps how many run at
+ * once; `SCAN_BUDGET_MS` is also now a real backstop (see `runExtract`'s use
+ * of `withTimeout` around the whole model-extraction phase), not just a
+ * between-steps check, so a hung request can no longer leave the scan row on
+ * `running` forever. `SCAN_BUDGET_MS` itself is untouched — it is
+ * deliberately below the JobRunner's 120s timeout so a scan that overruns
+ * still writes its own terminal state instead of leaving the UI on a
+ * permanent `running`.
+ */
+export const SAMPLE_FILE_LIMIT = 24;
+
+/**
+ * Max extraction batches in flight at once. Measured on a real scan: 6/6
+ * batches fully parallel triggered provider-side throttling severe enough
+ * that not one batch settled (fulfilled OR rejected-by-timeout) for 10+
+ * minutes. Capping concurrency trades a bit of wall-clock time for requests
+ * that actually complete or time out as configured — and `runExtract`'s own
+ * `SCAN_BUDGET_MS` deadline (see above) is the backstop if they still don't.
+ */
+export const EXTRACTION_CONCURRENCY = 3;
 
 /**
  * Config files read verbatim (when present) and turned into rules by code —
@@ -28,6 +57,14 @@ export const EXTRACTION_BATCH_SIZE = 4;
 
 /** Cap per category, so the list is not eight variations of one rule. */
 export const MAX_CANDIDATES_PER_CATEGORY = 3;
+
+/**
+ * A category earns its own `<repo>-<category>-conventions` skill only once it
+ * has at least this many accepted candidates. Below the threshold its
+ * candidates merge into the general `<repo>-conventions` skill instead — a
+ * category with exactly one accepted rule does not justify its own skill.
+ */
+export const SKILL_CATEGORY_MIN_CANDIDATES = 2;
 
 /**
  * A rule corroborated by a single occurrence is a coincidence, not a

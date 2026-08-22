@@ -28,11 +28,19 @@ file routinely lands in several slices. A `repository.ts` is both
 | `e2e/specs/*.flow.json`, `e2e/**` | e2e | — → rule **B9**, `e2e/AGENTS.md` |
 | `.github/workflows/**` | config | — → rule **B10**, `TESTING.md` lanes |
 | `.claude/skills/**`, `skills-lock.json` | config | — → `scripts/check-skills-lock.mjs` gate |
+| `.claude/agents/**` | config | — → `.claude/agents/README.md` house style; no mechanical gate exists |
 | `**/*.md`, `docs/**`, `specs/**`, `insights/**` | docs | — |
 
 `security` has no glob because it has no boundary: an injection, a leaked key or
 a missing authz check can live in a React component as easily as in a route
 handler. It runs on the whole changed-source set as one slice.
+
+`.claude/agents/**` lands in the `config` slice because it is harness
+configuration, not documentation — a manual review checks it against the
+house style in `.claude/agents/README.md`: frontmatter (`name` matches the
+file name, `tools` listed explicitly, `skills` exist on disk), the fixed
+output format, and a tool set that matches the declared role (a read-only
+agent gets no `Write`/`Edit`).
 
 ## Deliberately unrouted
 

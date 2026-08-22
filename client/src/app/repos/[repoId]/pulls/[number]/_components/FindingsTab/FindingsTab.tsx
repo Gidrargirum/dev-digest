@@ -22,6 +22,10 @@ interface FindingsTabProps {
   /** owner/repo + head sha — used to deep-link a finding's file:line to GitHub. */
   repoFullName?: string | null;
   headSha?: string | null;
+  /** From `?finding=<id>` — opens + scrolls to that finding's card (see
+   *  page.tsx). Reuses the same runId/nonce accordion mechanism as the
+   *  Timeline's "go to review" click. */
+  targetFindingId?: string | null;
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
@@ -38,6 +42,7 @@ export function FindingsTab({
   cancelMutation,
   repoFullName,
   headSha,
+  targetFindingId,
   onOpenTrace,
   onDelete,
   onRunDone,
@@ -66,11 +71,30 @@ export function FindingsTab({
 
   // Timeline → Review-runs navigation: clicking an agent name in the timeline
   // opens + scrolls to that run's accordion below. The nonce re-triggers the
-  // scroll even when the same run is clicked twice.
-  const [target, setTarget] = React.useState<{ runId: string; n: number } | null>(null);
+  // scroll even when the same run is clicked twice. `findingId` is set only
+  // for a deep-link target (?finding=<id>) — it additionally focuses +
+  // expands that finding's card once the accordion is open.
+  const [target, setTarget] = React.useState<{
+    runId: string;
+    n: number;
+    findingId: string | null;
+  } | null>(null);
   const handleGoToReview = useCallback((runId: string) => {
-    setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1 }));
+    setTarget((p) => ({ runId, n: (p?.n ?? 0) + 1, findingId: null }));
   }, []);
+
+  // ?finding=<id> deep link: find the review that owns this finding and
+  // (re)target its accordion. `lastTargetedFindingId` guards against
+  // re-triggering on every unrelated re-render (e.g. an accept/dismiss
+  // mutation) — it only fires again when the URL's finding id itself changes.
+  const lastTargetedFindingId = React.useRef<string | null>(null);
+  React.useEffect(() => {
+    if (!targetFindingId || targetFindingId === lastTargetedFindingId.current) return;
+    const review = runs.find((r) => r.findings.some((f) => f.id === targetFindingId));
+    if (!review?.run_id) return;
+    lastTargetedFindingId.current = targetFindingId;
+    setTarget((p) => ({ runId: review.run_id!, n: (p?.n ?? 0) + 1, findingId: targetFindingId }));
+  }, [targetFindingId, runs]);
 
   // Lets each ReviewRunAccordion show its run's cost/tokens without a second
   // fetch — prRuns already carries them, keyed by run_id.
@@ -184,6 +208,7 @@ export function FindingsTab({
             headSha={headSha}
             targetRunId={target?.runId ?? null}
             targetNonce={target?.n ?? 0}
+            targetFindingId={target?.findingId ?? null}
             runSummary={review.run_id ? runSummaryById.get(review.run_id) : undefined}
           />
         ))

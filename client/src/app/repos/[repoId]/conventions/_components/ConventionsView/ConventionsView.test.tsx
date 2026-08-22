@@ -36,8 +36,12 @@ vi.mock("@/lib/hooks/conventions", () => ({
     mutateAsync: patchMutateAsync,
     isPending: false,
   }),
-  useConventionSkillDraft: () => ({ data: undefined, isLoading: true }),
-  useCreateConventionSkill: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useConventionSkillDrafts: () => ({ data: undefined, isLoading: true }),
+  useCreateConventionSkills: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}));
+
+vi.mock("@/lib/hooks/agents", () => ({
+  useAgents: () => ({ data: [], isLoading: false }),
 }));
 
 vi.mock("@/components/app-shell", () => ({

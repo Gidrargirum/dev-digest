@@ -74,7 +74,9 @@
   "createSkill": {
     "title": "Create skill from conventions",
     "loading": "Assembling the draft…",
+    "subtitleReady": "{count, plural, one {# skill} other {# skills}} ready to create",
     "banner": "Merged from {count, plural, one {# accepted convention} other {# accepted conventions}} in {repo}. Everything below is editable before you save.",
+    "sectionGeneral": "General",
     "fields": {
       "name": "Name",
       "namePlaceholder": "repo-conventions",
@@ -92,6 +94,11 @@
       "custom": "custom"
     },
     "tokenEstimate": "≈ {count} tokens",
+    "agents": {
+      "label": "Attach to agents",
+      "hint": "Optional — the new skill is added to each selected agent's prompt.",
+      "empty": "No agents yet."
+    },
     "cancel": "Cancel",
     "create": "Create skill",
     "creating": "Creating…",

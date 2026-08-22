@@ -27,6 +27,7 @@ export function FindingCard({
   f,
   focused,
   defaultExpanded,
+  expandSignal,
   onAction,
   pending,
   repoFullName,
@@ -35,6 +36,10 @@ export function FindingCard({
   f: FindingRecord;
   focused?: boolean;
   defaultExpanded?: boolean;
+  /** Bumping this (e.g. a deep-link nonce) force-expands the card, even if
+   *  the user had collapsed it. `0`/`undefined` is "no signal" — mirrors the
+   *  targetNonce pattern used by ReviewRunAccordion. */
+  expandSignal?: number;
   onAction?: (action: FindingActionKind, reply?: string) => void;
   pending?: boolean;
   repoFullName?: string | null;
@@ -42,6 +47,9 @@ export function FindingCard({
 }) {
   const t = useTranslations("prReview");
   const [expanded, setExpanded] = React.useState(defaultExpanded ?? false);
+  React.useEffect(() => {
+    if (expandSignal) setExpanded(true);
+  }, [expandSignal]);
   const sevColor = SEV_COLOR[f.severity] ?? SEV_COLOR_FALLBACK;
   const fileHref =
     repoFullName && headSha

@@ -32,6 +32,7 @@ export function ReviewRunAccordion({
   headSha,
   targetRunId = null,
   targetNonce = 0,
+  targetFindingId = null,
   runSummary,
 }: {
   review: ReviewRecord;
@@ -43,6 +44,10 @@ export function ReviewRunAccordion({
    *  (driven from the Timeline: clicking an agent name navigates here). */
   targetRunId?: string | null;
   targetNonce?: number;
+  /** From a `?finding=<id>` deep link — forwarded to this run's FindingsPanel,
+   *  which focuses + expands the matching card. Harmless when this review
+   *  doesn't own the finding (FindingsPanel just won't find a match). */
+  targetFindingId?: string | null;
   /** This run's cost/token stats (matched by run_id); undefined for reviews
    *  with no matching agent_runs row (e.g. legacy CI-imported reviews). */
   runSummary?: RunSummary;
@@ -170,6 +175,8 @@ export function ReviewRunAccordion({
             prId={prId}
             repoFullName={repoFullName}
             headSha={headSha}
+            targetFindingId={targetFindingId}
+            targetNonce={targetNonce}
           />
         </div>
       )}

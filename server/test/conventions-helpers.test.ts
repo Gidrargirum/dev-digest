@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildSkillDraft,
+  buildSkillDrafts,
   buildSkillMarkdown,
   capPerCategory,
   findSnippetLine,
@@ -318,5 +319,109 @@ describe('buildSkillDraft', () => {
       },
     ]);
     expect(draft.description).toBe('1 house convention extracted from payments-api');
+  });
+});
+
+describe('buildSkillDrafts', () => {
+  const c = (
+    id: string,
+    category: string,
+    confidence: number,
+    rule = `${category} rule ${id}`,
+  ) =>
+    ({
+      id,
+      category,
+      confidence,
+      rule,
+      evidence_path: `src/${category}.ts`,
+      evidence_line: 1,
+      evidence_end_line: 1,
+      evidence_snippet: `// ${rule}`,
+    }) as never;
+
+  it('returns [] for an empty input', () => {
+    expect(buildSkillDrafts('payments-api', [])).toEqual([]);
+  });
+
+  it("opens each draft's body with an H1 matching that draft's own name", () => {
+    const drafts = buildSkillDrafts('payments-api', [
+      c('a1', 'async', 0.9),
+      c('a2', 'async', 0.7),
+      c('n1', 'naming', 0.6),
+      c('n2', 'naming', 0.5),
+      c('lonely', 'security', 0.8),
+    ]);
+
+    // A `<repo>-naming-conventions` skill whose body opened with
+    // `# <repo>-conventions` would read as the wrong file, and every
+    // per-category skill would carry the very same heading.
+    for (const draft of drafts) {
+      expect(draft.body.split('\n')[0]).toBe(`# ${draft.name}`);
+    }
+    expect(new Set(drafts.map((d) => d.body.split('\n')[0])).size).toBe(drafts.length);
+  });
+
+  it('gives each category with >=2 accepted candidates its own named draft', () => {
+    const drafts = buildSkillDrafts('payments-api', [
+      c('a1', 'async', 0.9),
+      c('a2', 'async', 0.7),
+      c('n1', 'naming', 0.6),
+      c('n2', 'naming', 0.5),
+      c('s1', 'structure', 0.95),
+      c('s2', 'structure', 0.4),
+    ]);
+
+    expect(drafts).toHaveLength(3);
+    const names = drafts.map((d) => d.name);
+    expect(names).toContain('payments-api-async-conventions');
+    expect(names).toContain('payments-api-naming-conventions');
+    expect(names).toContain('payments-api-structure-conventions');
+
+    // Sorted by descending max confidence within the group: structure (0.95)
+    // leads, then async (0.9), then naming (0.6).
+    expect(names).toEqual([
+      'payments-api-structure-conventions',
+      'payments-api-async-conventions',
+      'payments-api-naming-conventions',
+    ]);
+
+    for (const d of drafts) {
+      expect(d.category).not.toBeNull();
+    }
+  });
+
+  it('merges singleton categories into one general skill', () => {
+    const drafts = buildSkillDrafts('payments-api', [
+      c('a1', 'async', 0.9),
+      c('n1', 'naming', 0.6),
+      c('s1', 'structure', 0.5),
+    ]);
+
+    expect(drafts).toHaveLength(1);
+    expect(drafts[0]!.name).toBe('payments-api-conventions');
+    expect(drafts[0]!.category).toBeNull();
+    expect(drafts[0]!.convention_ids.sort()).toEqual(['a1', 'n1', 's1']);
+  });
+
+  it('mixes grouped and merged drafts, each holding only its own convention ids', () => {
+    const drafts = buildSkillDrafts('payments-api', [
+      c('a1', 'async', 0.9),
+      c('a2', 'async', 0.8),
+      c('n1', 'naming', 0.3),
+      c('api1', 'api', 0.2),
+    ]);
+
+    expect(drafts).toHaveLength(2);
+    const asyncDraft = drafts.find((d) => d.name === 'payments-api-async-conventions')!;
+    expect(asyncDraft.convention_ids.sort()).toEqual(['a1', 'a2']);
+
+    const generalDraft = drafts.find((d) => d.category === null)!;
+    expect(generalDraft.name).toBe('payments-api-conventions');
+    expect(generalDraft.convention_ids.sort()).toEqual(['api1', 'n1']);
+
+    // No overlap: every id appears in exactly one draft.
+    const allIds = drafts.flatMap((d) => d.convention_ids);
+    expect(new Set(allIds).size).toBe(allIds.length);
   });
 });

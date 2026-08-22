@@ -92,3 +92,65 @@ describe('assemblePrompt — ## Skills / rules', () => {
     expect(assemblePrompt({ system: 'sys', diff: 'DIFF', skills: [] }).assembly.skills ?? null).toBeNull();
   });
 });
+
+/**
+ * Intent slot (plans/intent-layer.md step 3 / specs/pr-intent-layer.md "Prompt
+ * contract"): a strict addition — omitted, `assemblePrompt` must be
+ * byte-identical to a call with no `intent` field at all.
+ */
+describe('assemblePrompt — ## Derived PR intent', () => {
+  it('byte-identity: omitting `intent` produces messages identical to another call with no `intent` field', () => {
+    const partsWithoutIntent = {
+      system: 'AGENT-SYS',
+      diff: 'DIFF',
+      task: 'Review PR #482',
+      prDescription: 'Adds rate limiting.',
+      skills: ['# Rule\nDo X.'],
+    };
+    const baseline = assemblePrompt(partsWithoutIntent);
+    const again = assemblePrompt(partsWithoutIntent);
+
+    // Compared against the result of another call — not a snapshot.
+    expect(again.messages[0]!.content).toBe(baseline.messages[0]!.content);
+    expect(again.messages[1]!.content).toBe(baseline.messages[1]!.content);
+
+    // Also true when `intent` is explicitly passed as `undefined` — the slot
+    // being present-but-empty must not change a single byte either.
+    const withUndefinedIntent = assemblePrompt({ ...partsWithoutIntent, intent: undefined });
+    expect(withUndefinedIntent.messages[0]!.content).toBe(baseline.messages[0]!.content);
+    expect(withUndefinedIntent.messages[1]!.content).toBe(baseline.messages[1]!.content);
+    expect(withUndefinedIntent.assembly.intent ?? null).toBeNull();
+  });
+
+  it('renders the section (untrusted-wrapped) between PR description and Skills / rules', () => {
+    const intentText = 'Adds rate limiting to the public API to stop abusive callers.';
+    const { messages, assembly } = assemblePrompt({
+      system: 'sys',
+      diff: 'DIFF',
+      prDescription: 'Adds rate limiting.',
+      skills: ['# Rule\nDo X.'],
+      intent: intentText,
+    });
+    const user = messages[1]!.content;
+
+    expect(user).toContain('## Derived PR intent');
+    expect(user).toContain('<untrusted source="intent">');
+    expect(user).toContain(intentText);
+
+    // Ordering: after "## PR description", before "## Skills / rules".
+    expect(user.indexOf('## PR description')).toBeLessThan(user.indexOf('## Derived PR intent'));
+    expect(user.indexOf('## Derived PR intent')).toBeLessThan(user.indexOf('## Skills / rules'));
+
+    expect(assembly.intent).toBe(intentText);
+  });
+
+  it('does not render the section and `assembly.intent` is null when intent is blank/whitespace-only', () => {
+    const blank = assemblePrompt({ system: 'sys', diff: 'DIFF', intent: '   ' });
+    expect(blank.messages[1]!.content).not.toContain('## Derived PR intent');
+    expect(blank.assembly.intent).toBeNull();
+
+    const empty = assemblePrompt({ system: 'sys', diff: 'DIFF', intent: '' });
+    expect(empty.messages[1]!.content).not.toContain('## Derived PR intent');
+    expect(empty.assembly.intent).toBeNull();
+  });
+});

@@ -29,18 +29,54 @@ export const FeatureModelChoice = z.object({
 export type FeatureModelChoice = z.infer<typeof FeatureModelChoice>;
 
 /**
- * Registry of the selectable features: stable id, display label, and the
- * built-in default used when the workspace hasn't overridden the choice. The
- * defaults MIRROR each module's constants, so behaviour is unchanged until a
- * model is explicitly picked.
+ * What a feature with no default of its own inherits its model from.
+ *
+ * Deliberately NOT a `FeatureModelId`: `review_agent` is the agent picked for
+ * the review run itself (it lives in the `agents` table), not another entry in
+ * this registry — so it can never be resolved by looking it up in
+ * `FEATURE_MODELS`. Naming it as its own closed set keeps the target checkable
+ * instead of a bare string literal nothing validates.
  */
-export interface FeatureModelDef {
+export const ModelInheritanceSource = z.enum(['review_agent']);
+export type ModelInheritanceSource = z.infer<typeof ModelInheritanceSource>;
+
+interface FeatureModelBase {
   id: FeatureModelId;
   label: string;
   description: string;
+}
+
+/** A feature that ships its own built-in default model. */
+export interface FeatureModelWithDefault extends FeatureModelBase {
   defaultProvider: Provider;
   defaultModel: string;
+  inheritsFrom?: never;
 }
+
+/** A feature with no default of its own — it follows another model's choice
+ *  unless the workspace picks one explicitly. */
+export interface FeatureModelInherited extends FeatureModelBase {
+  defaultProvider?: never;
+  defaultModel?: never;
+  inheritsFrom: ModelInheritanceSource;
+}
+
+/**
+ * Registry of the selectable features: stable id, display label, and either a
+ * built-in default (mirroring each module's constants, so behaviour is
+ * unchanged until a model is explicitly picked) or an inheritance source.
+ *
+ * A discriminated union on purpose: "provider without model" and "neither a
+ * default nor an inheritance source" are both meaningless states, and making
+ * them unrepresentable is what lets consumers narrow instead of asserting.
+ */
+export type FeatureModelDef = FeatureModelWithDefault | FeatureModelInherited;
+
+/** Narrows a registry entry to the variant that carries a complete default. */
+export function hasDefaultModel(f: FeatureModelDef): f is FeatureModelWithDefault {
+  return f.defaultProvider !== undefined && f.defaultModel !== undefined;
+}
+
 export const FEATURE_MODELS: FeatureModelDef[] = [
   {
     id: 'onboarding',
@@ -53,8 +89,7 @@ export const FEATURE_MODELS: FeatureModelDef[] = [
     id: 'review_intent',
     label: 'PR Review · Intent',
     description: 'Derives a PR’s intent and scope before review.',
-    defaultProvider: 'openai',
-    defaultModel: 'gpt-4.1',
+    inheritsFrom: 'review_agent',
   },
   {
     id: 'risk_brief',

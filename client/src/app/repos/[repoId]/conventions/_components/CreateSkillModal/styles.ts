@@ -30,19 +30,12 @@ export const s = {
     lineHeight: 1.5,
     marginBottom: 20,
   } satisfies CSSProperties,
-  enabledLabel: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: 10,
-    fontSize: 13,
-    fontWeight: 600,
-    color: "var(--text-secondary)",
+  agentsList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    maxHeight: 160,
+    overflowY: "auto",
   } satisfies CSSProperties,
-  enabledSwitch: { display: "inline-flex" } satisfies CSSProperties,
-  tokenEstimate: {
-    fontSize: 12,
-    color: "var(--text-muted)",
-    marginTop: -12,
-    marginBottom: 20,
-  } satisfies CSSProperties,
+  agentsEmpty: { fontSize: 13, color: "var(--text-muted)" } satisfies CSSProperties,
 } as const;
