@@ -255,6 +255,22 @@ to `overview` rather than rendering nothing.)
   already makes, not a new gap. The link is disabled/rendered as plain text
   when `repoFullName` is unavailable — same compromise applied to the Prior
   PRs section's `#number` link.
+
+  **Known limitation — line numbers reflect the indexed SHA, not `head_sha`.**
+  A caller's `file:line` comes from repo-intel's persistent index, which was
+  computed at `repo_index_state.last_indexed_sha` — not necessarily the same
+  commit as the PR's `head_sha` used to build the link. If the caller's file
+  has changed on the base branch since the repo was last (re)indexed, the
+  line the link opens on GitHub can be off by however many lines shifted
+  above the call site. This is not a bug in the reference extractor
+  (`adapters/astgrep/index.ts#parseReferences` returns the exact line for
+  whatever content it was given — verified directly); it is inherent to
+  serving from a point-in-time index without live re-parsing, which is also
+  the reason the server never rebuilds the AST/import graph per request (see
+  "No LLM call" and the top of this spec). Re-indexing the repo (`Resync`)
+  corrects it going forward. Not solved here — an in-request diff between
+  the indexed and head SHA to adjust line numbers would be real complexity
+  for a cosmetic gap that self-heals on the next index refresh.
 - Styling lives in `styles.ts` as plain `CSSProperties`; `vendor/ui` is not
   modified.
 
