@@ -50,6 +50,7 @@ import {
   INDEX_JOB_KIND,
   INDEXER_VERSION,
   MAX_CALLERS_PER_SYMBOL,
+  MAX_HOP_WIDTH,
   REFRESH_JOB_KIND,
   RESYNC_JOB_KIND,
   SUPPORTED_EXT,
@@ -376,9 +377,86 @@ export class RepoIntelService implements RepoIntel {
     }
     callers.sort((a, b) => b.rank - a.rank);
 
-    // Precomputed facts per caller file (endpoints + crons), so consumers can
-    // attribute them to the changed symbol whose callers live in that file.
-    const facts = await this.repo.getFileFacts(repoId, callerFiles);
+    // Per-symbol cap (bug fix): group by viaSymbol first, THEN slice each
+    // group to MAX_CALLERS_PER_SYMBOL. Slicing the combined, globally-sorted
+    // array (the old behaviour) silently dropped callers of whichever symbol
+    // sorted second. `callers` is already rank-DESC, so each group built by
+    // iterating it stays rank-DESC internally — the per-group slice is a true
+    // top-N-by-rank for that symbol.
+    const bySymbol = new Map<string, BlastCallerRow[]>();
+    for (const c of callers) {
+      const group = bySymbol.get(c.viaSymbol);
+      if (group) group.push(c);
+      else bySymbol.set(c.viaSymbol, [c]);
+    }
+    const cappedCallers: BlastCallerRow[] = [];
+    const truncatedSymbols: string[] = [];
+    for (const [viaSymbol, group] of bySymbol) {
+      if (group.length > MAX_CALLERS_PER_SYMBOL) truncatedSymbols.push(viaSymbol);
+      cappedCallers.push(...group.slice(0, MAX_CALLERS_PER_SYMBOL));
+    }
+    cappedCallers.sort((a, b) => b.rank - a.rank);
+
+    // Depth-2 reverse-import walk: hop 1 = callerFiles (direct callers, already
+    // resolved above). Hops 2..BFS_DEPTH walk importers of the previous hop's
+    // frontier via getImportersOf, reusing the same depth bound
+    // getCriticalPaths uses for its (forward) walk — no second depth constant.
+    // A hub file (barrel index.ts) can fan out to most of the repo, so each
+    // hop's frontier is capped to MAX_HOP_WIDTH files (top-rank first) and the
+    // result is flagged `hopCapped` rather than silently truncated.
+    let frontier = [...new Set(callerFiles)];
+    const visited = new Set<string>([...changedFiles, ...frontier]);
+    const reverseHopFiles: string[] = [];
+    // hop1File -> hop2 files that import it (see BlastResult.hop2ByHop1 doc).
+    const hop2ByHop1 = new Map<string, Set<string>>();
+    let hopCapped = false;
+    let hop2Failed = false;
+    try {
+      for (let depth = 1; depth < BFS_DEPTH; depth += 1) {
+        if (frontier.length === 0) break;
+        const importerRows = await this.repo.getImportersOf(repoId, frontier);
+        const nextSet = new Set<string>();
+        for (const row of importerRows) {
+          if (visited.has(row.fromFile)) continue;
+          nextSet.add(row.fromFile);
+        }
+        let next = [...nextSet];
+        if (next.length > MAX_HOP_WIDTH) {
+          const ranks = await this.repo.getFileRankFor(repoId, next);
+          const rankOf = new Map(ranks.map((r) => [r.path, r.percentile]));
+          next = next
+            .sort((a, b) => (rankOf.get(b) ?? 0) - (rankOf.get(a) ?? 0))
+            .slice(0, MAX_HOP_WIDTH);
+          hopCapped = true;
+        }
+        const nextSurvivors = new Set(next);
+        for (const row of importerRows) {
+          if (!nextSurvivors.has(row.fromFile)) continue;
+          const group = hop2ByHop1.get(row.toFile);
+          if (group) group.add(row.fromFile);
+          else hop2ByHop1.set(row.toFile, new Set([row.fromFile]));
+        }
+        for (const f of next) visited.add(f);
+        reverseHopFiles.push(...next);
+        frontier = next;
+      }
+    } catch {
+      // Never throw out of a persistent-blast helper (DEGRADED CONTRACT): the
+      // reverse-import hop-2 request itself failed (e.g. a transient DB
+      // error) — signal `hop2Failed` and keep going with whatever hop-1 data
+      // was already resolved above. Flipping `degraded` here would be wrong:
+      // that field means "no usable data at all" and would erase the
+      // perfectly good hop-1 `callers`/`changedSymbols` computed earlier in
+      // this method, which `mapBlastResult` (blast/helpers.ts) discards
+      // wholesale on `degraded: true`.
+      hop2Failed = true;
+    }
+
+    // Precomputed facts per hop-1 ∪ hop-2 file (endpoints + crons), so
+    // consumers can attribute them to the changed symbol whose callers live
+    // in that file.
+    const factFiles = [...new Set([...callerFiles, ...reverseHopFiles])];
+    const facts = await this.repo.getFileFacts(repoId, factFiles);
     const endpoints = new Set<string>();
     const factsByFile: Record<string, { endpoints: string[]; crons: string[] }> = {};
     for (const f of facts) {
@@ -386,13 +464,25 @@ export class RepoIntelService implements RepoIntel {
       for (const e of f.endpoints) endpoints.add(e);
     }
 
-    return {
+    const result: BlastResult = {
       changedSymbols,
-      callers: callers.slice(0, MAX_CALLERS_PER_SYMBOL),
+      callers: cappedCallers,
       impactedEndpoints: [...endpoints],
       factsByFile,
       degraded: false,
     };
+    if (truncatedSymbols.length > 0) result.truncatedSymbols = truncatedSymbols;
+    if (hopCapped) {
+      result.hopCapped = true;
+      result.hopWidthLimit = MAX_HOP_WIDTH;
+    }
+    if (hop2Failed) result.hop2Failed = true;
+    if (hop2ByHop1.size > 0) {
+      result.hop2ByHop1 = Object.fromEntries(
+        [...hop2ByHop1].map(([hop1File, hop2Files]) => [hop1File, [...hop2Files]]),
+      );
+    }
+    return result;
   }
 
   /**

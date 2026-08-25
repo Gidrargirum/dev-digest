@@ -20,6 +20,9 @@ export const Intent = z.object({
 export type Intent = z.infer<typeof Intent>;
 
 // ---- Blast radius ----
+export const BlastStatus = z.enum(['ok', 'partial', 'degraded']);
+export type BlastStatus = z.infer<typeof BlastStatus>;
+
 export const ChangedSymbol = z.object({
   name: z.string(),
   file: z.string(),
@@ -39,6 +42,8 @@ export const DownstreamImpact = z.object({
   callers: z.array(BlastCaller),
   endpoints_affected: z.array(z.string()),
   crons_affected: z.array(z.string()),
+  /** MAX_CALLERS_PER_SYMBOL was hit for this symbol. */
+  callers_truncated: z.boolean(),
 });
 export type DownstreamImpact = z.infer<typeof DownstreamImpact>;
 
@@ -48,6 +53,19 @@ export const BlastRadius = z.object({
   summary: z.string(),
 });
 export type BlastRadius = z.infer<typeof BlastRadius>;
+
+export const PrBlastResponse = z.object({
+  status: BlastStatus,
+  reason: z.string().nullable(),
+  blast: BlastRadius.nullable(),
+  counts: z.object({
+    symbols: z.number().int(),
+    callers: z.number().int(),
+    endpoints: z.number().int(),
+    crons: z.number().int(),
+  }),
+});
+export type PrBlastResponse = z.infer<typeof PrBlastResponse>;
 
 // ---- Risks ----
 export const RiskSeverity = z.enum(['high', 'medium', 'low']);
