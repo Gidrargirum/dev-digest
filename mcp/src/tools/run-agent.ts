@@ -27,20 +27,7 @@ function guardKey(repoId: string, pullId: string): string {
   return `${repoId}:${pullId}`;
 }
 
-/**
- * Emits one MCP progress notification per poll tick. Optional: a caller with
- * no `progressToken` on its request (or a client that never sends one) just
- * skips this — the tool still works, it only loses the client-side
- * timeout-reset benefit `pollUntilTerminal`'s doc comment describes.
- */
-export interface ProgressReporter {
-  report(progress: number, message?: string): Promise<void>;
-}
-
-export async function runAgentOnPullRequest(
-  input: RunAgentInput,
-  progress?: ProgressReporter,
-): Promise<RunAgentOutput> {
+export async function runAgentOnPullRequest(input: RunAgentInput): Promise<RunAgentOutput> {
   const repo = await resolveRepo(input.repo);
   const pull = await resolvePull(repo.id, input.pr);
   const agent = await resolveAgent(input.agent);
@@ -62,16 +49,9 @@ export async function runAgentOnPullRequest(
       );
     }
 
-    let tick = 0;
     const result = await pollUntilTerminal(pull.id, run.run_id, {
       timeoutMs: config.runTimeoutMs,
       intervalMs: config.pollIntervalMs,
-      onTick: progress
-        ? () => {
-            tick += 1;
-            return progress.report(tick, `Waiting on run ${run.run_id}…`);
-          }
-        : undefined,
     });
 
     if (result === 'timeout') {
