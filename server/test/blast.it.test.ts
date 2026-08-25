@@ -124,6 +124,7 @@ d('GET /pulls/:id/blast (Testcontainers pg)', () => {
     expect(body.blast.downstream).toHaveLength(1);
     expect(body.blast.downstream[0].symbol).toBe('limit');
     expect(body.counts).toEqual({ symbols: 1, callers: 1, endpoints: 1, crons: 0 });
+    expect(body.prior_prs).toEqual([]);
 
     await app.close();
   });
@@ -181,6 +182,7 @@ d('GET /pulls/:id/blast (Testcontainers pg)', () => {
     expect(body.status).toBe('degraded');
     expect(body.blast).toBeNull();
     expect(body.reason).toBeTruthy();
+    expect(body.prior_prs).toEqual([]);
 
     await app.close();
   });

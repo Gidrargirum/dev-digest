@@ -4,8 +4,10 @@ import type {
   ChangedSymbol,
   DownstreamImpact,
   PrBlastResponse,
+  PriorPrRef,
 } from '@devdigest/shared';
 import type { BlastDegradedReason, BlastRadiusResult } from './types.js';
+import type { PriorPrRow } from './repository.js';
 
 /** Human-readable text for each degraded reason the repo-intel facade emits. */
 const DEGRADED_REASON_MESSAGES: Record<BlastDegradedReason, string> = {
@@ -33,6 +35,16 @@ function degradedReasonMessage(reason?: BlastDegradedReason): string {
     : 'Blast radius is unavailable for this repo right now.';
 }
 
+/** `PriorPrRow` (repository read model) → `PriorPrRef` (the HTTP/shared contract). */
+function mapPriorPrs(rows: PriorPrRow[]): PriorPrRef[] {
+  return rows.map((row) => ({
+    number: row.number,
+    title: row.title,
+    updated_at: row.updatedAt ? row.updatedAt.toISOString() : null,
+    overlap_count: row.overlapCount,
+  }));
+}
+
 /**
  * `BlastResult` (repo-intel's read model) → `PrBlastResponse` (the HTTP/shared
  * contract). Pure mapping, no I/O — per spec §"application (service.ts)":
@@ -40,14 +52,19 @@ function degradedReasonMessage(reason?: BlastDegradedReason): string {
  * endpoints/crons per symbol from the `factsByFile` of that symbol's caller
  * files, and compute `status`/`reason`/`counts` from the degraded/hopCapped
  * signals already carried by `BlastResult`.
+ *
+ * `priorPrs` is independent of repo-intel — a plain DB aggregate — so it is
+ * always mapped and included on EVERY branch, including `degraded`, where
+ * `blast` itself is `null`.
  */
-export function mapBlastResult(result: BlastRadiusResult): PrBlastResponse {
+export function mapBlastResult(result: BlastRadiusResult, priorPrs: PriorPrRow[]): PrBlastResponse {
   if (result.degraded) {
     return {
       status: 'degraded',
       reason: degradedReasonMessage(result.reason),
       blast: null,
       counts: { symbols: 0, callers: 0, endpoints: 0, crons: 0 },
+      prior_prs: mapPriorPrs(priorPrs),
     };
   }
 
@@ -137,12 +154,20 @@ export function mapBlastResult(result: BlastRadiusResult): PrBlastResponse {
   // `degraded` (see repo-intel/types.ts's BlastResult doc comments). Prefer
   // the width-cap message when both are somehow set, since it's the more
   // specific/actionable of the two.
+  const priorPrsRef = mapPriorPrs(priorPrs);
+
   if (result.hopCapped) {
-    return { status: 'partial', reason: hopCappedReason(result.hopWidthLimit), blast, counts };
+    return {
+      status: 'partial',
+      reason: hopCappedReason(result.hopWidthLimit),
+      blast,
+      counts,
+      prior_prs: priorPrsRef,
+    };
   }
   if (result.hop2Failed) {
-    return { status: 'partial', reason: HOP2_FAILED_REASON, blast, counts };
+    return { status: 'partial', reason: HOP2_FAILED_REASON, blast, counts, prior_prs: priorPrsRef };
   }
 
-  return { status: 'ok', reason: null, blast, counts };
+  return { status: 'ok', reason: null, blast, counts, prior_prs: priorPrsRef };
 }

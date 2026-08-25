@@ -1,22 +1,41 @@
 import type { CSSProperties } from "react";
 
 export const s = {
+  /** Card shell, matching IntentCard's card (`OverviewTab/_components/IntentCard/styles.ts`)
+   *  so the two Overview cards read as one system. */
+  card: {
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    background: "var(--bg-elevated)",
+    padding: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  } satisfies CSSProperties,
   loading: {
     display: "flex",
     flexDirection: "column",
     gap: 12,
   } satisfies CSSProperties,
+  // Left side is the counts group, right side is the Tree/Graph toggle —
+  // `justify-content: space-between` keeps them pinned to opposite edges. Do
+  // not center this row.
   countsRow: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 8,
+  } satisfies CSSProperties,
+  counts: {
     display: "flex",
     flexWrap: "wrap",
     gap: 8,
-    marginBottom: 16,
   } satisfies CSSProperties,
   partialNote: {
     display: "flex",
     alignItems: "center",
     gap: 8,
-    marginBottom: 16,
     padding: "10px 14px",
     borderRadius: 8,
     border: "1px solid var(--warn)",
@@ -38,7 +57,7 @@ export const s = {
   entry: {
     border: "1px solid var(--border)",
     borderRadius: 8,
-    background: "var(--bg-elevated)",
+    background: "var(--bg-base)",
     overflow: "hidden",
   } satisfies CSSProperties,
   entryHeader: {
@@ -112,5 +131,77 @@ export const s = {
     fontSize: 12,
     color: "var(--text-muted)",
     marginTop: 8,
+  } satisfies CSSProperties,
+  // The Tree/Graph switch — right side of `countsRow`, see that comment.
+  viewToggle: {
+    display: "flex",
+    gap: 6,
+  } satisfies CSSProperties,
+  graphNote: {
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  // Same approach as IntentCard's `riskSection` (`OverviewTab/_components/IntentCard/styles.ts`):
+  // a bordered, padded block separating this card's second section from the first.
+  priorPrsSection: {
+    borderTop: "1px solid var(--border)",
+    paddingTop: 14,
+  } satisfies CSSProperties,
+  priorPrsToggle: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    cursor: "pointer",
+  } satisfies CSSProperties,
+  priorPrsToggleLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    fontSize: 13,
+    fontWeight: 600,
+    color: "var(--text-primary)",
+  } satisfies CSSProperties,
+  priorPrsToggleMeta: {
+    marginLeft: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+  } satisfies CSSProperties,
+  priorPrsList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+    marginTop: 10,
+  } satisfies CSSProperties,
+  priorPrRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    fontSize: 13,
+  } satisfies CSSProperties,
+  priorPrLeft: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    minWidth: 0,
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  priorPrTitle: {
+    color: "var(--text-secondary)",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  } satisfies CSSProperties,
+  priorPrMeta: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    flexShrink: 0,
+    color: "var(--text-muted)",
+    fontSize: 12,
   } satisfies CSSProperties,
 } as const;

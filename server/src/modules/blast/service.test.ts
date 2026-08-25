@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { BlastService } from './service.js';
-import type { BlastRepository } from './repository.js';
+import type { BlastRepository, PriorPrRow } from './repository.js';
 import type { BlastRadiusResult, BlastRadiusSource } from './types.js';
 
 /**
@@ -14,10 +14,15 @@ const WORKSPACE_ID = 'ws-1';
 const PR_ID = 'pr-1';
 const REPO_ID = 'repo-1';
 
-function fakeRepo(opts: { resolved?: { id: string; repoId: string } | undefined; files?: string[] }) {
+function fakeRepo(opts: {
+  resolved?: { id: string; repoId: string } | undefined;
+  files?: string[];
+  priorPrs?: PriorPrRow[];
+}) {
   return {
     resolvePr: vi.fn(async () => opts.resolved),
     getChangedFiles: vi.fn(async () => opts.files ?? []),
+    findPriorPrs: vi.fn(async () => opts.priorPrs ?? []),
   } as unknown as BlastRepository;
 }
 
@@ -155,8 +160,11 @@ describe('BlastService.getBlast', () => {
     expect(response!.blast!.downstream[0]!.endpoints_affected).toEqual(['GET /foo']);
   });
 
-  it('status: degraded when repo-intel has no usable index — blast: null, non-null reason, zero counts', async () => {
-    const repo = fakeRepo({ resolved: { id: PR_ID, repoId: REPO_ID }, files: ['src/a.ts'] });
+  it('status: degraded when repo-intel has no usable index — blast: null, non-null reason, zero counts, prior_prs still populated', async () => {
+    const priorPrs: PriorPrRow[] = [
+      { number: 42, title: 'Refactor rate limiting', updatedAt: new Date('2026-01-01T00:00:00Z'), overlapCount: 2 },
+    ];
+    const repo = fakeRepo({ resolved: { id: PR_ID, repoId: REPO_ID }, files: ['src/a.ts'], priorPrs });
     const result: BlastRadiusResult = {
       changedSymbols: [],
       callers: [],
@@ -173,5 +181,21 @@ describe('BlastService.getBlast', () => {
     expect(response!.blast).toBeNull();
     expect(response!.reason).toBeTruthy();
     expect(response!.counts).toEqual({ symbols: 0, callers: 0, endpoints: 0, crons: 0 });
+    expect(response!.prior_prs).toEqual([
+      { number: 42, title: 'Refactor rate limiting', updated_at: '2026-01-01T00:00:00.000Z', overlap_count: 2 },
+    ]);
+  });
+
+  it('maps prior_prs with a null updated_at, and calls findPriorPrs with an empty changed-files list unchanged', async () => {
+    const priorPrs: PriorPrRow[] = [{ number: 7, title: 'Old PR', updatedAt: null, overlapCount: 1 }];
+    const repo = fakeRepo({ resolved: { id: PR_ID, repoId: REPO_ID }, files: [], priorPrs });
+    const result: BlastRadiusResult = { changedSymbols: [], callers: [], impactedEndpoints: [] };
+    const repoIntel = fakeRepoIntel(result);
+    const service = new BlastService(repo, repoIntel);
+
+    const response = await service.getBlast(WORKSPACE_ID, PR_ID);
+
+    expect(repo.findPriorPrs).toHaveBeenCalledWith(REPO_ID, PR_ID, []);
+    expect(response!.prior_prs).toEqual([{ number: 7, title: 'Old PR', updated_at: null, overlap_count: 1 }]);
   });
 });

@@ -3,7 +3,6 @@
 import React, { useCallback } from "react";
 import { Icon, Avatar, Badge, Button, Tabs } from "@devdigest/ui";
 import { RunReviewDropdown } from "../RunReviewDropdown";
-import { usePrBlast } from "@/lib/hooks/blast";
 import { s } from "./styles";
 import type { PrDetail } from "@/lib/types";
 
@@ -29,12 +28,6 @@ export function PrDetailHeader({
   onRunStart,
   onRunsStarted,
 }: PrDetailHeaderProps) {
-  // Badge count only — the tab's own content is fetched again inside BlastTab.
-  // Same TanStack Query cache key (["pr-blast", prId]), so this doesn't cost
-  // a second request; it just lets the header show a count before the tab
-  // itself is ever opened.
-  const { data: blast } = usePrBlast(prId);
-
   const handleRunStart = useCallback(() => {
     onRunStart();
   }, [onRunStart]);
@@ -123,7 +116,6 @@ export function PrDetailHeader({
           { key: "overview", label: "Overview", icon: "FileText" },
           { key: "findings", label: "Agent runs", icon: "AlertOctagon", count: findingsCount || undefined },
           { key: "diff", label: "Files changed", icon: "Code", count: pr.files_count },
-          { key: "blast", label: "Blast", icon: "Workflow", count: blast?.counts.symbols || undefined },
         ]}
       />
     </div>

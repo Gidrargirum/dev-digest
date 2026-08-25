@@ -14,7 +14,6 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
-import { BlastTab } from "./_components/BlastTab";
 import { readDiffMode } from "./_components/DiffTab/helpers";
 import type { DiffMode } from "./_components/DiffTab/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
@@ -25,6 +24,8 @@ import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { githubPrUrl } from "@/lib/github-urls";
 import type { FindingRecord } from "@devdigest/shared";
+
+const KNOWN_TABS = ["overview", "findings", "diff"];
 
 export default function PRDetailPage() {
   const params = useParams<{ repoId: string; number: string }>();
@@ -66,7 +67,11 @@ export default function PRDetailPage() {
     if (prId) qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
   };
 
-  const tab = search.get("tab") ?? "overview";
+  // An unknown value (including a stale `?tab=blast` link from before Blast
+  // Radius moved into Overview) falls back to Overview instead of rendering
+  // nothing — none of the `tab === ...` branches below would otherwise match.
+  const requestedTab = search.get("tab") ?? "overview";
+  const tab = KNOWN_TABS.includes(requestedTab) ? requestedTab : "overview";
   const traceRunId = search.get("trace");
   const targetFindingId = search.get("finding");
   const diffMode: DiffMode = readDiffMode(search.get("diffMode"));
@@ -154,7 +159,9 @@ export default function PRDetailPage() {
       />
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
-        {tab === "overview" && <OverviewTab prId={prId} prBody={pr.body} />}
+        {tab === "overview" && (
+          <OverviewTab prId={prId} prBody={pr.body} repoFullName={repoFullName} headSha={pr.head_sha} />
+        )}
 
         {tab === "findings" && (
           <FindingsTab
@@ -194,10 +201,6 @@ export default function PRDetailPage() {
             onSetDiffMode={(mode) => setParam("diffMode", mode === "smart" ? "smart" : null)}
             onOpenFinding={(id) => setParams([["tab", "findings"], ["finding", id], ["diffMode", null]])}
           />
-        )}
-
-        {tab === "blast" && (
-          <BlastTab prId={prId} repoFullName={repoFullName} headSha={pr.head_sha} />
         )}
       </div>
 

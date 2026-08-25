@@ -47,6 +47,7 @@ export const prFiles = pgTable(
   },
   (t) => ({
     prIdx: index('pr_files_pr_idx').on(t.prId),
+    pathIdx: index('pr_files_path_idx').on(t.path),
   }),
 );
 

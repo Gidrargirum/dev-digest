@@ -32,7 +32,10 @@ export class BlastService implements BlastPort {
     if (!pr) return undefined;
 
     const changedFiles = await this.repo.getChangedFiles(pr.id);
-    const result = await this.repoIntel.getBlastRadius(pr.repoId, changedFiles);
-    return mapBlastResult(result);
+    const [result, priorPrs] = await Promise.all([
+      this.repoIntel.getBlastRadius(pr.repoId, changedFiles),
+      this.repo.findPriorPrs(pr.repoId, pr.id, changedFiles),
+    ]);
+    return mapBlastResult(result, priorPrs);
   }
 }
