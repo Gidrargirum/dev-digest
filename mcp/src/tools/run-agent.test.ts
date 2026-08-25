@@ -163,6 +163,44 @@ describe('runAgentOnPullRequest', () => {
     expect(result.next).toMatch(/get_findings/);
   });
 
+  it('reports progress on every poll tick when a reporter is given, and none once terminal', async () => {
+    stubFetch({
+      'POST /pulls/pull-1/review': () =>
+        jsonResponse({
+          pr_id: 'pull-1',
+          runs: [{ run_id: 'run-5', agent_id: 'agent-1', agent_name: 'Security Reviewer' }],
+        }),
+      'GET /pulls/pull-1/runs': vi
+        .fn()
+        .mockReturnValueOnce(jsonResponse([{ run_id: 'run-5', status: 'running', error: null }]))
+        .mockReturnValueOnce(jsonResponse([{ run_id: 'run-5', status: 'done', error: null }])),
+      'GET /pulls/pull-1/reviews': () =>
+        jsonResponse([
+          {
+            id: 'review-5',
+            agent_id: 'agent-1',
+            agent_name: 'Security Reviewer',
+            run_id: 'run-5',
+            verdict: 'approve',
+            score: 100,
+            created_at: '2026-08-01T00:00:00.000Z',
+            findings: [],
+          },
+        ]),
+    });
+    const report = vi.fn().mockResolvedValue(undefined);
+
+    const promise = runAgentOnPullRequest(
+      { repo: 'acme/widgets', pr: 42, agent: 'Security Reviewer' },
+      { report },
+    );
+    await vi.advanceTimersByTimeAsync(1_000);
+    await promise;
+
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledWith(1, expect.stringContaining('run-5'));
+  });
+
   it('rejects a second concurrent call for the same repo#pr while the first is still in flight', async () => {
     let resolveRunsCall!: (r: Response) => void;
     const pendingRuns = new Promise<Response>((resolve) => {

@@ -16,11 +16,16 @@ import { getBlastRadius } from './tools/get-blast-radius.js';
 import { getConventions } from './tools/get-conventions.js';
 import { getFindings } from './tools/get-findings.js';
 import { listAgents } from './tools/list-agents.js';
-import { runAgentOnPullRequest } from './tools/run-agent.js';
+import { runAgentOnPullRequest, type ProgressReporter } from './tools/run-agent.js';
 import { TOOL_DEFINITIONS, type ToolDefinition } from './tools/schemas.js';
 
-/** One handler per tool name, in the same order/identity as `TOOL_DEFINITIONS`. */
-const TOOL_HANDLERS: Record<string, (input: never) => Promise<unknown>> = {
+/**
+ * One handler per tool name, in the same order/identity as `TOOL_DEFINITIONS`.
+ * The optional second arg is only meaningful to `run_agent_on_pull_request`
+ * (the one tool that can run long enough to need it); every other handler
+ * ignores it.
+ */
+const TOOL_HANDLERS: Record<string, (input: never, progress?: ProgressReporter) => Promise<unknown>> = {
   list_agents: listAgents,
   run_agent_on_pull_request: runAgentOnPullRequest,
   get_findings: getFindings,
@@ -39,6 +44,11 @@ const TOOL_HANDLERS: Record<string, (input: never) => Promise<unknown>> = {
  * safety — only the overload resolution that TS can't do statically for a
  * dynamic definition list.
  */
+interface ToolCallbackExtra {
+  _meta?: { progressToken?: string | number };
+  sendNotification: (notification: unknown) => Promise<void>;
+}
+
 type LooseRegisterTool = (
   name: string,
   config: {
@@ -46,12 +56,35 @@ type LooseRegisterTool = (
     inputSchema?: z.ZodTypeAny;
     outputSchema?: z.ZodTypeAny;
   },
-  cb: (args: unknown) => Promise<{
+  cb: (args: unknown, extra: ToolCallbackExtra) => Promise<{
     content: [{ type: 'text'; text: string }];
     structuredContent?: Record<string, unknown>;
     isError?: boolean;
   }>,
 ) => void;
+
+/**
+ * Builds a `ProgressReporter` from the SDK's per-request `extra` when the
+ * caller attached a `progressToken` — most clients (the SDK's own `Client`
+ * included) reset their request-timeout clock on receiving a
+ * `notifications/progress` for that token, which is what keeps a run that
+ * takes the full `runTimeoutMs` from being killed client-side well before
+ * the server would time it out itself. No token → `undefined`, and every
+ * handler already treats a missing reporter as "don't bother" (see
+ * `run-agent.ts`).
+ */
+function progressReporterFor(extra: ToolCallbackExtra): ProgressReporter | undefined {
+  const progressToken = extra._meta?.progressToken;
+  if (progressToken === undefined) return undefined;
+  return {
+    async report(progress, message) {
+      await extra.sendNotification({
+        method: 'notifications/progress',
+        params: { progressToken, progress, message },
+      });
+    },
+  };
+}
 
 function registerTool(server: McpServer, definition: ToolDefinition): void {
   const handler = TOOL_HANDLERS[definition.name];
@@ -70,9 +103,9 @@ function registerTool(server: McpServer, definition: ToolDefinition): void {
       inputSchema: definition.inputSchema as z.ZodTypeAny,
       outputSchema: definition.outputSchema as z.ZodTypeAny,
     },
-    async (args) => {
+    async (args, extra) => {
       try {
-        const result = await handler(args as never);
+        const result = await handler(args as never, progressReporterFor(extra));
         return {
           content: [{ type: 'text', text: JSON.stringify(result) }],
           structuredContent: result as Record<string, unknown>,

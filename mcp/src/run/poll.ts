@@ -38,9 +38,22 @@ function sleep(ms: number): Promise<void> {
 export async function pollUntilTerminal(
   pullId: string,
   runId: string,
-  options: { timeoutMs: number; intervalMs: number },
+  options: {
+    timeoutMs: number;
+    intervalMs: number;
+    /**
+     * Called once per poll iteration, after the status check. Lets the
+     * caller emit an MCP progress notification — most clients (the
+     * `@modelcontextprotocol/sdk` Client included) reset their own
+     * request-timeout clock on receipt, so a run genuinely taking the full
+     * `timeoutMs` doesn't get killed client-side well before the server
+     * would time it out. Errors from `onTick` are swallowed: a failed
+     * notification must never abort the poll itself.
+     */
+    onTick?: () => void | Promise<void>;
+  },
 ): Promise<RunSummary | 'timeout'> {
-  const { timeoutMs, intervalMs } = options;
+  const { timeoutMs, intervalMs, onTick } = options;
   const start = Date.now();
 
   while (true) {
@@ -53,6 +66,14 @@ export async function pollUntilTerminal(
 
     if (Date.now() - start > timeoutMs) {
       return 'timeout';
+    }
+
+    if (onTick) {
+      try {
+        await onTick();
+      } catch {
+        // Notification delivery is best-effort — see doc comment above.
+      }
     }
 
     await sleep(intervalMs);

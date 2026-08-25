@@ -61,4 +61,38 @@ describe('pollUntilTerminal', () => {
 
     expect(result).toBe('timeout');
   });
+
+  it('calls onTick once per non-terminal iteration, not on the final terminal check', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([runRow({ status: 'running' })]))
+      .mockResolvedValueOnce(jsonResponse([runRow({ status: 'running' })]))
+      .mockResolvedValueOnce(jsonResponse([runRow({ status: 'done' })]));
+    globalThis.fetch = fetchMock;
+    const onTick = vi.fn();
+
+    const promise = pollUntilTerminal('pull-1', 'run-1', { timeoutMs: 30_000, intervalMs: 2_000, onTick });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await promise;
+
+    expect(onTick).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps polling even when onTick rejects', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse([runRow({ status: 'running' })]))
+      .mockResolvedValueOnce(jsonResponse([runRow({ status: 'done' })]));
+    globalThis.fetch = fetchMock;
+    const onTick = vi.fn().mockRejectedValue(new Error('notification channel closed'));
+
+    const promise = pollUntilTerminal('pull-1', 'run-1', { timeoutMs: 30_000, intervalMs: 2_000, onTick });
+
+    await vi.advanceTimersByTimeAsync(2_000);
+    const result = await promise;
+
+    expect(result).toMatchObject({ run_id: 'run-1', status: 'done' });
+  });
 });
