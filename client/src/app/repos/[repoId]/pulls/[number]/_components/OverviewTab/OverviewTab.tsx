@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { SectionLabel } from "@devdigest/ui";
+import { Markdown, SectionLabel } from "@devdigest/ui";
 import { usePrIntent } from "@/lib/hooks/reviews";
 import { IntentCard } from "./_components/IntentCard";
 import { BlastRadiusCard } from "./_components/BlastRadiusCard";
@@ -27,7 +27,9 @@ export function OverviewTab({ prId, prBody, repoFullName, headSha }: OverviewTab
         {prBody && (
           <section>
             <SectionLabel icon="MessageSquare">Description</SectionLabel>
-            <div style={s.descriptionBox}>{prBody}</div>
+            <div style={s.descriptionBox}>
+              <Markdown>{prBody}</Markdown>
+            </div>
           </section>
         )}
       </div>
