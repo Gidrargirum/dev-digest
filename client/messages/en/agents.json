@@ -119,7 +119,13 @@
     "save": "Save context",
     "saving": "Saving…",
     "saved": "Context saved",
-    "savedToast": "Context saved"
+    "savedToast": "Context saved",
+    "tokensShort": "{count}t",
+    "preview": "Preview",
+    "previewClose": "Close preview",
+    "previewPanel": "Document preview",
+    "previewError": "Couldn’t load this document",
+    "dragHandle": "Reorder {name} — drag, or use arrow keys"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
