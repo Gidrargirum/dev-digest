@@ -16,7 +16,6 @@ export const s = {
     gap: 4,
     marginBottom: 12,
   } satisfies CSSProperties,
-  toolbarSpacer: { flex: 1 } satisfies CSSProperties,
   filterRow: { marginBottom: 12, maxWidth: 360 } satisfies CSSProperties,
   uploadError: { fontSize: 12, color: "var(--crit)", marginBottom: 10 } satisfies CSSProperties,
   layout: { display: "flex", gap: 16, alignItems: "flex-start" } satisfies CSSProperties,

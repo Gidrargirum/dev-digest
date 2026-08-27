@@ -120,7 +120,6 @@ export function ProjectContextView({ repoId }: { repoId: string }) {
               label={t("tree.upload")}
               onClick={() => fileInput.current?.click()}
             />
-            <span style={s.toolbarSpacer} />
             <IconBtn icon="RefreshCw" label={t("tree.refresh")} onClick={refresh} />
             <input
               ref={fileInput}
