@@ -17,6 +17,16 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
 
 - **2026-08-02** — The seeded review in `server/src/db/seed.ts` has no `run_id` and no matching `agent_runs` row, so on a freshly seeded stack the Agent runs **timeline** is empty even though the review + its 2 findings render in the accordion below. A flow asserting anything per-run (score, findings breakdown, trace button) has nothing to hook onto — assert on the accordion instead, or on the PR list, which reads findings straight off the reviews.
 
+- **2026-08-27** — Flow `10-smart-diff` failed in CI (always) but passed locally: it clicked the
+  `find text "Hardcoded Stripe secret key…"` chip right after `wait --text "BOILERPLATE"`. The
+  group HEADER renders synchronously, but the chip inside it depends on the **reviews fetch** — on a
+  slow runner the click landed before the chip mounted (or before its React `onClick` attached), so
+  `find … click` exited 0 on a no-op node and the next `wait --url tab=findings` timed out 30s
+  later. Same class as the 2026-08-13 "wait --text for the row first" entry, one level deeper. Fix:
+  `wait --load networkidle` + an explicit `wait --text` for the chip's own text, and click it via
+  `find role button --name "Open finding: …"` (the `aria-label`) so agent-browser's actionability
+  wait targets the real <button>, not a text node inside it.
+
 ## Tool & Library Notes
 
 - **2026-08-13** — `agent-browser wait --text` matches **rendered** text, not DOM `textContent`.
