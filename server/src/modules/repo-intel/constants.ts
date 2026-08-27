@@ -33,6 +33,14 @@ export const EXCLUDED_DIRS = [
 export const MAX_CALLERS_PER_SYMBOL = 20;
 
 /**
+ * [T3] Blast depth-2 endpoint discovery — max files considered per reverse-
+ * import hop. A hub file (barrel `index.ts`) can fan out to most of the repo;
+ * beyond this width the hop is capped to the top-rank files (see
+ * `BlastResult.hopCapped`).
+ */
+export const MAX_HOP_WIDTH = 200;
+
+/**
  * [T1] Bumped whenever the AST extractor or symbol schema changes. A mismatch
  * with `repo_index_state.indexer_version` forces a full reindex.
  *

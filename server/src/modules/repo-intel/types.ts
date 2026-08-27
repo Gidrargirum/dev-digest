@@ -88,6 +88,37 @@ export interface BlastResult {
   factsByFile?: Record<string, { endpoints: string[]; crons: string[] }>;
   degraded?: boolean;
   reason?: DegradedReason;
+  /** Symbols whose caller list was truncated to MAX_CALLERS_PER_SYMBOL. */
+  truncatedSymbols?: string[];
+  /**
+   * True when a reverse-import hop (hop 2, importers of hop-1 caller files)
+   * exceeded the 200-file width cap and was truncated to top-rank files.
+   */
+  hopCapped?: boolean;
+  /**
+   * The width cap (`MAX_HOP_WIDTH`) that was applied when `hopCapped` is
+   * true. Carried as data (not hardcoded in `modules/blast/`, which cannot
+   * import `repo-intel/constants.ts` across the module boundary) so the
+   * human-readable message stays in sync with the actual constant.
+   */
+  hopWidthLimit?: number;
+  /**
+   * True when the reverse-import hop-2 walk (`getImportersOf`) itself threw
+   * (e.g. a transient DB error) — distinct from `hopCapped` (hop completed
+   * but was too wide). Hop-1 `callers`/`changedSymbols` are still valid and
+   * are NOT discarded; only hop-2 endpoint/cron discovery is missing. This
+   * must never flip `degraded` — that field means "no usable data at all",
+   * which hop-1 data contradicts.
+   */
+  hop2Failed?: boolean;
+  /**
+   * Hop-1 caller file → the hop-2 files that import it (i.e. import the
+   * caller file without calling the changed symbol directly). Lets
+   * `modules/blast/` attribute a hop-2 file's endpoints/crons to the
+   * specific changed symbol whose hop-1 callers live in that hop-1 file,
+   * instead of smearing every hop-2 endpoint across every changed symbol.
+   */
+  hop2ByHop1?: Record<string, string[]>;
 }
 
 // ---------------------------------------------------------------------------

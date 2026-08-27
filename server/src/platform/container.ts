@@ -32,6 +32,9 @@ import { RepoIntelRepository } from '../modules/repo-intel/repository.js';
 import type { IntentPort } from '../modules/intent/types.js';
 import { IntentService } from '../modules/intent/service.js';
 import { IntentRepository } from '../modules/intent/repository.js';
+import { BlastService } from '../modules/blast/service.js';
+import type { BlastPort } from '../modules/blast/types.js';
+import { BlastRepository } from '../modules/blast/repository.js';
 import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
@@ -63,6 +66,7 @@ export interface ContainerOverrides {
   tokenizer?: Tokenizer;
   /** Intent facade — tests inject a mock IntentPort implementation. */
   intent?: IntentPort;
+  blast?: BlastPort;
   /** Project Context Folder reader+writer — tests inject a mock implementation. */
   contextDocs?: ContextDocsReader & ContextDocsWriter;
   /** Project Context Folder service — tests inject a mock/stub ContextService. */
@@ -94,6 +98,7 @@ export class Container {
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
   private _intent?: IntentPort;
+  private _blast?: BlastPort;
   private _contextDocs?: ContextDocsReader & ContextDocsWriter;
   private _projectContext?: ContextService;
 
@@ -169,6 +174,19 @@ export class Container {
       new IntentRepository(this.db),
     );
     return this._intent;
+  }
+
+  /**
+   * Blast Radius facade (`modules/blast/README.md`) — resolves a PR's changed
+   * symbols/callers/endpoints from the repo-intel index. Takes ports
+   * (`BlastRepository`, and `this.repoIntel`, which structurally satisfies
+   * `BlastRadiusSource`), never `this`. Tests inject a mock via
+   * `ContainerOverrides.blast`.
+   */
+  get blast(): BlastPort {
+    if (this.overrides.blast) return this.overrides.blast;
+    this._blast ??= new BlastService(new BlastRepository(this.db), this.repoIntel);
+    return this._blast;
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */

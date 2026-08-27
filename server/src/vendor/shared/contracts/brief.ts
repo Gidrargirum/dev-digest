@@ -20,6 +20,9 @@ export const Intent = z.object({
 export type Intent = z.infer<typeof Intent>;
 
 // ---- Blast radius ----
+export const BlastStatus = z.enum(['ok', 'partial', 'degraded']);
+export type BlastStatus = z.infer<typeof BlastStatus>;
+
 export const ChangedSymbol = z.object({
   name: z.string(),
   file: z.string(),
@@ -39,6 +42,8 @@ export const DownstreamImpact = z.object({
   callers: z.array(BlastCaller),
   endpoints_affected: z.array(z.string()),
   crons_affected: z.array(z.string()),
+  /** MAX_CALLERS_PER_SYMBOL was hit for this symbol. */
+  callers_truncated: z.boolean(),
 });
 export type DownstreamImpact = z.infer<typeof DownstreamImpact>;
 
@@ -48,6 +53,42 @@ export const BlastRadius = z.object({
   summary: z.string(),
 });
 export type BlastRadius = z.infer<typeof BlastRadius>;
+
+/**
+ * A PR in the same repo that touched at least one of the current PR's
+ * changed files — "Prior PRs touching these files" (see specs/blast-radius.md
+ * "Not implemented", now implemented as a top-level field of
+ * `PrBlastResponse`). Deliberately NOT `PrHistoryItem` above: that type is
+ * for the LLM-authored PR history section (`merged_at`/`notes`), while this
+ * one is a plain DB aggregate with no model involved — any PR in the repo
+ * regardless of status, not just merged ones.
+ */
+export const PriorPrRef = z.object({
+  number: z.number().int(),
+  title: z.string(),
+  updated_at: z.string().nullable(),
+  overlap_count: z.number().int(),
+});
+export type PriorPrRef = z.infer<typeof PriorPrRef>;
+
+export const PrBlastResponse = z.object({
+  status: BlastStatus,
+  reason: z.string().nullable(),
+  blast: BlastRadius.nullable(),
+  counts: z.object({
+    symbols: z.number().int(),
+    callers: z.number().int(),
+    endpoints: z.number().int(),
+    crons: z.number().int(),
+  }),
+  /**
+   * Top PRs in the same repo (any status) that touched files this PR also
+   * touched — independent of the repo-intel index, so present even when
+   * `status: 'degraded'` and `blast: null`.
+   */
+  prior_prs: z.array(PriorPrRef),
+});
+export type PrBlastResponse = z.infer<typeof PrBlastResponse>;
 
 // ---- Risks ----
 export const RiskSeverity = z.enum(['high', 'medium', 'low']);

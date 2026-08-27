@@ -17,6 +17,19 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
 
 - **2026-08-02** — The seeded review in `server/src/db/seed.ts` has no `run_id` and no matching `agent_runs` row, so on a freshly seeded stack the Agent runs **timeline** is empty even though the review + its 2 findings render in the accordion below. A flow asserting anything per-run (score, findings breakdown, trace button) has nothing to hook onto — assert on the accordion instead, or on the PR list, which reads findings straight off the reviews.
 
+- **2026-08-27** — Flow `10-smart-diff` failed in CI (always, since it was added) but passed
+  locally 10/10. The failure screenshot (CI artifact `e2e-failure`) was the key: the finding chip
+  is inside the **4th** Smart-Diff file card — each seeded `pr_files` row has `patch = NULL` so
+  every card renders a tall "No diff text available" body, pushing the chip far below the fold.
+  `agent-browser find role button … click` (Rust/CDP, not Playwright) does **not** reliably
+  auto-scroll an off-screen target into view on the slower/headless CI runner — the click landed on
+  nothing, exited 0, and the next `wait --url tab=findings` timed out 30s later. Local Chrome
+  happened to have the element close enough. Fix: an explicit `scrollintoview`
+  `button[aria-label="…"]` step immediately before the click (plus `wait --load networkidle` +
+  `wait --text` for the chip, and clicking by `find role button --name` so the target is the real
+  <button>). **Takeaway: when a flow clicks something that can be below the fold, add
+  `scrollintoview` — don't assume the driver scrolls for you.**
+
 ## Tool & Library Notes
 
 - **2026-08-13** — `agent-browser wait --text` matches **rendered** text, not DOM `textContent`.

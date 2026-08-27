@@ -22,6 +22,8 @@ for a client test run.
 | `client/**` touched | `pnpm lint` | `client` | B4 |
 | `client/**` touched | `pnpm test` | `client` | B4 |
 | `reviewer-core/**` touched | `npm run typecheck` && `npm test` | `reviewer-core` | B4 |
+| `mcp/**` touched | `pnpm typecheck` | `mcp` | B4 |
+| `mcp/**` touched | `pnpm test` | `mcp` | B4 |
 | any `vendor/shared/**` touched | `node scripts/sync-shared.mjs --check` | repo root | B1 |
 | `.claude/skills/**` or `skills-lock.json` touched | `node scripts/check-skills-lock.mjs` | repo root | B10 |
 

@@ -16,7 +16,7 @@ Node ≥ 22, pnpm ≥ 10, Docker (for Postgres only).
 
 ## Packages
 
-Four independent packages, **no workspace**: each has its own `package.json`
+Five independent packages, **no workspace**: each has its own `package.json`
 and lockfile; cross-package code is shared through tsconfig path aliases to
 source, not through published npm packages.
 
@@ -26,6 +26,7 @@ source, not through published npm packages.
 | `client/` | Next.js studio, :3000 | [AGENTS.md](./client/AGENTS.md) | [README](./client/README.md) |
 | `reviewer-core/` | pure review engine | [AGENTS.md](./reviewer-core/AGENTS.md) | [README](./reviewer-core/README.md) |
 | `e2e/` | browser flows | [AGENTS.md](./e2e/AGENTS.md) | [README](./e2e/README.md) |
+| `mcp/` | local MCP server (stdio) | [AGENTS.md](./mcp/AGENTS.md) | [README](./mcp/README.md) |
 
 `@devdigest/shared` — Zod contracts, **vendored as two copies**
 (`server/src/vendor/shared`, `client/src/vendor/shared`). The copies have

@@ -22,6 +22,7 @@ file routinely lands in several slices. A `repository.ts` is both
 | `server/src/adapters/**`, `server/src/platform/**`, `server/src/ports/**` | server-backend | `onion-architecture` |
 | `server/test/**`, `server/**/*.test.ts` | tests | — → rules **B5**, **B9** |
 | `reviewer-core/src/**` | domain | `onion-architecture` |
+| `mcp/src/**` | mcp | `typescript-expert`, `zod` |
 | `server/src/vendor/shared/**`, `client/src/vendor/shared/**` | contracts | `zod` (+ the vendor-parity gate) |
 | any `**/*.ts` / `**/*.tsx` touching types, generics, or `tsconfig*.json` | — | `typescript-expert` |
 | any changed source file | — | `security` — **always**, on every branch that touches code |

@@ -106,10 +106,35 @@
     },
     {
       "cmd": [
+        "wait",
+        "--load",
+        "networkidle"
+      ],
+      "label": "the review's findings have loaded (chips depend on the reviews fetch)"
+    },
+    {
+      "cmd": [
+        "wait",
+        "--text",
+        "Hardcoded Stripe secret key in commit"
+      ],
+      "label": "the unanchored finding chip is actually rendered (not just its group header)"
+    },
+    {
+      "cmd": [
+        "scrollintoview",
+        "button[aria-label=\"Open finding: Hardcoded Stripe secret key in commit\"]"
+      ],
+      "label": "the chip lives in the 4th file card, well below the fold — scroll it into view"
+    },
+    {
+      "cmd": [
         "find",
-        "text",
-        "Hardcoded Stripe secret key in commit",
-        "click"
+        "role",
+        "button",
+        "click",
+        "--name",
+        "Open finding: Hardcoded Stripe secret key in commit"
       ],
       "label": "click the seeded finding's unanchored chip on src/config.ts"
     },
