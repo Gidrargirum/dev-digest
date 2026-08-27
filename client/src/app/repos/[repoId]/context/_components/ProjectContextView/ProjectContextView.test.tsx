@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { NextIntlClientProvider } from "next-intl";
 import type { ContextDoc, ContextFolder } from "@devdigest/shared";
 import messages from "../../../../../../../messages/en/context.json";
@@ -51,10 +52,13 @@ function doc(over: Partial<ContextDoc> = {}): ContextDoc {
 }
 
 function renderView() {
+  const qc = new QueryClient();
   return render(
-    <NextIntlClientProvider locale="en" messages={{ context: messages }}>
-      <ProjectContextView repoId="r1" />
-    </NextIntlClientProvider>,
+    <QueryClientProvider client={qc}>
+      <NextIntlClientProvider locale="en" messages={{ context: messages }}>
+        <ProjectContextView repoId="r1" />
+      </NextIntlClientProvider>
+    </QueryClientProvider>,
   );
 }
 

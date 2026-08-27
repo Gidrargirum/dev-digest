@@ -6,6 +6,7 @@
 "use client";
 
 import React from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import { EmptyState, ErrorState, Icon, IconBtn, Skeleton, TextInput } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
@@ -54,9 +55,20 @@ export function ProjectContextView({ repoId }: { repoId: string }) {
     { label: t("title") },
   ];
 
+  const qc = useQueryClient();
+  // Re-scan the catalog AND every derived per-document query for this repo —
+  // the catalog (docs/folders), each open document's content, and the COVERAGE
+  // counts ("N of M workspace agents"), which live in their own query keyed by
+  // path and are otherwise stale after an attachment changes elsewhere.
   const refresh = () => {
-    void docsQuery.refetch();
-    void foldersQuery.refetch();
+    for (const key of [
+      "context-docs",
+      "context-folders",
+      "context-doc-content",
+      "context-coverage",
+    ]) {
+      void qc.invalidateQueries({ queryKey: [key, repoId] });
+    }
   };
 
   const onPickFile = async (file: File) => {
