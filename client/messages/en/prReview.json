@@ -126,6 +126,33 @@
       "low": "low",
       "medium": "medium",
       "high": "high"
-    }
+    },
+    "risks": "Risks",
+    "risksShowing": "Showing {shown} of {total}"
+  },
+  "whyRiskBrief": {
+    "title": "Why + Risk Brief",
+    "what": "What",
+    "why": "Why",
+    "riskLevel": "Risk level",
+    "riskLevelValue": {
+      "high": "High risk",
+      "medium": "Medium risk",
+      "low": "Low risk"
+    },
+    "reviewFocus": "Review focus",
+    "reviewFocusShowing": "Showing {shown} of {total}",
+    "reviewFocusEntry": "Review {path} line {line}: {reason}",
+    "regenerate": "Regenerate",
+    "regenerating": "Regenerating…",
+    "rateLimited": "Rate limited — next try in {seconds}s",
+    "updatedTitle": "Brief updated",
+    "updatedAction": "Show the new brief",
+    "notGeneratedTitle": "No brief generated yet",
+    "notGeneratedBody": "A Why + Risk Brief has not been generated for this pull request yet.",
+    "generate": "Generate brief",
+    "errorTitle": "Couldn’t load the brief",
+    "retry": "Retry",
+    "sources": "Sources: {list}"
   }
 }

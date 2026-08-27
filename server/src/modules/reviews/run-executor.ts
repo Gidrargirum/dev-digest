@@ -129,6 +129,20 @@ export class ReviewRunExecutor {
     // cache-keyed on (pr_id, head_sha), never a blocking dependency — any
     // failure degrades to "no intent section" and the review proceeds.
     const intentStep = await this.buildIntentStep(workspaceId, pull, repo, diff, jobs, runLog);
+    // PR Why + Risk Brief (spec 2026-08-27, AC-7): a completed review run makes
+    // an intent available; a brief stored without one must be recomputed even
+    // though the diff is unchanged — hence `{ force: true }` (the state key has
+    // no intent component). We `await` only the single enqueue INSERT, which
+    // finishes inside the review-run lifecycle; the brief work itself runs
+    // later inside the JobRunner, so no query starts after this run's resources
+    // are released. Best-effort: a failed enqueue never breaks the review.
+    // `this.container` is already held here (documented baseline debt); access
+    // goes through the public `container.brief` port — not a new violation.
+    try {
+      await this.container.brief.enqueueRecompute(workspaceId, pull.id, { force: true });
+    } catch {
+      /* best-effort — the review run completes regardless */
+    }
     // `jobs.length === 0` returned above, so `jobs[0]` is defined.
     const firstRunId = jobs[0]!.runId;
 

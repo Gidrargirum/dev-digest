@@ -279,11 +279,36 @@ export default async function pullsRoutes(appBase: FastifyInstance) {
         })
         .where(eq(t.pullRequests.id, pr.id));
 
+      // PR Why + Risk Brief (spec 2026-08-27): background, best-effort recompute
+      // now that `pr_files` is populated. We `await` only the single enqueue
+      // INSERT — the detail response never waits on the brief computation
+      // itself (AC-1), which runs later inside the JobRunner. Awaiting the
+      // enqueue keeps every DB query for this feature inside a live request.
+      // Idempotent via the state key, checked inside the job: an unchanged
+      // state → no LLM call (AC-3); a new head_sha OR diff-stats digest →
+      // recompute (AC-5).
+      try {
+        await container.brief.enqueueRecompute(workspaceId, pr.id);
+      } catch {
+        /* best-effort — the detail response is unaffected */
+      }
+
       return { ...detail, id: pr.id };
     } catch (err) {
       app.log.warn({ err }, 'GitHub PR detail refresh skipped (no token / offline); serving persisted detail');
       const files = await container.db.select().from(t.prFiles).where(eq(t.prFiles.prId, pr.id));
       const commits = await container.db.select().from(t.prCommits).where(eq(t.prCommits.prId, pr.id));
+
+      // PR Why + Risk Brief (spec 2026-08-27): same best-effort recompute on
+      // the offline-fallback path, over the persisted `pr_files`. Only the
+      // enqueue INSERT is awaited; the computation runs in the JobRunner
+      // (AC-1). State key makes it idempotent (AC-3/AC-5).
+      try {
+        await container.brief.enqueueRecompute(workspaceId, pr.id);
+      } catch {
+        /* best-effort — the detail response is unaffected */
+      }
+
       return {
         id: pr.id,
         number: pr.number,

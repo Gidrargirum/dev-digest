@@ -5,6 +5,7 @@
 import React from "react";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type DiffAnnotationApi, type DiffFindingMark } from "../annotations";
+import { ts, TARGET_LINE_ID } from "../targeting";
 import { type Line } from "../helpers";
 import { s, lineRowFor, lineSignFor } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
@@ -18,6 +19,7 @@ export function CodeLine({
   commenting,
   marks,
   annotations,
+  isTarget,
 }: {
   ln: Line;
   path: string;
@@ -27,6 +29,8 @@ export function CodeLine({
    *  `annotations` is undefined — plain diff mode is unaffected). */
   marks?: DiffFindingMark[];
   annotations?: DiffAnnotationApi;
+  /** This line is the addressed deep-link target (spec 2026-08-27, AC-28). */
+  isTarget?: boolean;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
@@ -45,7 +49,8 @@ export function CodeLine({
 
   return (
     <div
-      style={cs.rowWrap}
+      {...(isTarget ? { id: TARGET_LINE_ID } : {})}
+      style={isTarget ? { ...cs.rowWrap, ...ts.targetLine } : cs.rowWrap}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >

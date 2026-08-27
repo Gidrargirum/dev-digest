@@ -17,7 +17,7 @@ import { DiffTab } from "./_components/DiffTab";
 import { readDiffMode } from "./_components/DiffTab/helpers";
 import type { DiffMode } from "./_components/DiffTab/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
-import { usePullDetail, usePulls } from "@/lib/hooks";
+import { usePullDetail, usePulls, useDiffTarget } from "@/lib/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "@/lib/hooks/reviews";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
@@ -75,6 +75,7 @@ export default function PRDetailPage() {
   const traceRunId = search.get("trace");
   const targetFindingId = search.get("finding");
   const diffMode: DiffMode = readDiffMode(search.get("diffMode"));
+  const diffTarget = useDiffTarget();
   // Batches every param update into ONE URLSearchParams + ONE router.replace.
   // `search` is a snapshot of the current render, so two sequential single-
   // param `setParam` calls in the same handler would build from the same
@@ -91,6 +92,16 @@ export default function PRDetailPage() {
   };
   const setParam = (key: string, val: string | null) => setParams([[key, val]]);
   const setTab = (t: string) => setParam("tab", t);
+  // A Review Focus click (Why + Risk Brief card): one navigation to the Files
+  // Changed tab with the target file+line addressed, all other params kept,
+  // smart-diff cleared since a line is not addressable there (AC-27).
+  const openLine = (path: string, line: number) =>
+    setParams([
+      ["tab", "diff"],
+      ["file", path],
+      ["line", String(line)],
+      ["diffMode", null],
+    ]);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -160,7 +171,13 @@ export default function PRDetailPage() {
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
         {tab === "overview" && (
-          <OverviewTab prId={prId} prBody={pr.body} repoFullName={repoFullName} headSha={pr.head_sha} />
+          <OverviewTab
+            prId={prId}
+            prBody={pr.body}
+            repoFullName={repoFullName}
+            headSha={pr.head_sha}
+            onOpenLine={openLine}
+          />
         )}
 
         {tab === "findings" && (
@@ -198,6 +215,7 @@ export default function PRDetailPage() {
             reviews={runs}
             canComment={pr.status === "open"}
             diffMode={diffMode}
+            target={diffTarget}
             onSetDiffMode={(mode) => setParam("diffMode", mode === "smart" ? "smart" : null)}
             onOpenFinding={(id) => setParams([["tab", "findings"], ["finding", id], ["diffMode", null]])}
           />

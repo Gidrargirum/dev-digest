@@ -181,5 +181,16 @@ export async function buildApp(opts: BuildAppOptions = {}): Promise<FastifyInsta
   // Close the db handle we created on shutdown.
   if (handle) app.addHook('onClose', async () => handle.close());
 
+  // Drain any in-flight / queued background jobs before shutdown so a
+  // fire-and-forget trigger (e.g. the PR Why + Risk Brief recompute enqueued
+  // from a PR-detail read or a completed review run) never issues a query
+  // against a torn-down pool — that surfaces as an unhandled `CONNECTION_ENDED`
+  // rejection. Registered AFTER the handle-close hook so it runs BEFORE it
+  // (Fastify runs onClose hooks LIFO), and it is a no-op when the queue is
+  // already idle.
+  app.addHook('onClose', async () => {
+    await container.jobs.onIdle();
+  });
+
   return app;
 }

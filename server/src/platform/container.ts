@@ -35,7 +35,10 @@ import { IntentRepository } from '../modules/intent/repository.js';
 import { BlastService } from '../modules/blast/service.js';
 import type { BlastPort } from '../modules/blast/types.js';
 import { BlastRepository } from '../modules/blast/repository.js';
-import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
+import { BriefService } from '../modules/brief/service.js';
+import type { BriefPort } from '../modules/brief/types.js';
+import { BriefRepository } from '../modules/brief/repository.js';
+import { getFeatureModelOverride, resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 
@@ -63,6 +66,8 @@ export interface ContainerOverrides {
   /** Intent facade — tests inject a mock IntentPort implementation. */
   intent?: IntentPort;
   blast?: BlastPort;
+  /** Why + Risk Brief facade — tests inject a mock BriefPort implementation. */
+  brief?: BriefPort;
 }
 
 export class Container {
@@ -91,6 +96,7 @@ export class Container {
   private _priceBook?: PriceBook;
   private _intent?: IntentPort;
   private _blast?: BlastPort;
+  private _brief?: BriefPort;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -177,6 +183,33 @@ export class Container {
     if (this.overrides.blast) return this.overrides.blast;
     this._blast ??= new BlastService(new BlastRepository(this.db), this.repoIntel);
     return this._blast;
+  }
+
+  /**
+   * PR Why + Risk Brief facade (`modules/brief/README.md`) — background,
+   * best-effort brief per PR state. Takes ports, not `this` (onion rule 4).
+   * The `brief.compute` job handler is bound by
+   * `container.brief.registerJobHandlers()`, called once from the
+   * `brief/routes.ts` plugin body at boot (mirrors repo-intel) — not as a
+   * constructor side effect. Tests inject a mock via `ContainerOverrides.brief`.
+   *
+   * This getter is also the ONLY place `container.intent` is stitched into
+   * `BriefDeps.intent`, which keeps `no-cross-module-imports` intact — the
+   * brief module never imports `modules/intent/*`.
+   */
+  get brief(): BriefPort {
+    if (this.overrides.brief) return this.overrides.brief;
+    this._brief ??= new BriefService(
+      {
+        github: () => this.github(),
+        llm: (provider) => this.llm(provider),
+        featureModel: (workspaceId) => resolveFeatureModel(this.db, workspaceId, 'risk_brief'),
+        intent: (workspaceId, prId) => this.intent.get(workspaceId, prId),
+      },
+      new BriefRepository(this.db),
+      this.jobs,
+    );
+    return this._brief;
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */

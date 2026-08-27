@@ -9,12 +9,24 @@ export class ApiError extends Error {
   status: number;
   code?: string;
   details?: unknown;
-  constructor(message: string, status: number, code?: string, details?: unknown) {
+  /** Seconds until the caller may retry, parsed from a `Retry-After` response
+   *  header (present on a 429). `undefined` when the header is absent or
+   *  non-numeric. The client treats the server's value as authoritative
+   *  (spec 2026-08-27-pr-why-risk-brief, AC-39). */
+  retryAfter?: number;
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    details?: unknown,
+    retryAfter?: number,
+  ) {
     super(message);
     this.name = "ApiError";
     this.status = status;
     this.code = code;
     this.details = details;
+    this.retryAfter = retryAfter;
   }
 }
 
@@ -55,7 +67,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     } catch {
       /* non-JSON error body */
     }
-    throw new ApiError(message, res.status, code, details);
+    const retryAfterRaw = res.headers.get("retry-after");
+    const retryAfter =
+      retryAfterRaw != null && Number.isFinite(Number(retryAfterRaw))
+        ? Number(retryAfterRaw)
+        : undefined;
+    throw new ApiError(message, res.status, code, details, retryAfter);
   }
 
   if (res.status === 204) return undefined as T;

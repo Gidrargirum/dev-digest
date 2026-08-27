@@ -65,3 +65,30 @@ export const prBrief = pgTable('pr_brief', {
     .references(() => pullRequests.id, { onDelete: 'cascade' }),
   json: jsonb('json').notNull(),
 });
+
+/**
+ * Why + Risk Brief (spec 2026-08-27-pr-why-risk-brief) — a separate table from
+ * `pr_brief` above: it carries a `pr_state_key` cache column (`head_sha` +
+ * diff-stats digest, AC-4) that `pr_brief` has no place for, and it stores a
+ * different, grounded shape. One brief per PR, overwritten in place (PK on
+ * `pr_id`, same as `pr_intent`) — no brief history by design.
+ */
+export const prWhyRiskBrief = pgTable('pr_why_risk_brief', {
+  prId: uuid('pr_id')
+    .primaryKey()
+    .references(() => pullRequests.id, { onDelete: 'cascade' }),
+  prStateKey: text('pr_state_key').notNull(), // AC-4
+  what: text('what').notNull(),
+  why: text('why').notNull(),
+  // 'high' | 'medium' | 'low' — text, not a PG enum: business-logic-driven and
+  // validated by Zod (`RiskLevel.catch('low')`) at the read boundary, so a
+  // drifted label degrades rather than throws (mirrors `pr_intent.confidence`).
+  riskLevel: text('risk_level').notNull(),
+  risks: jsonb('risks').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+  reviewFocus: jsonb('review_focus').$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
+  risksTotal: integer('risks_total').notNull().default(0),
+  reviewFocusTotal: integer('review_focus_total').notNull().default(0),
+  sources: jsonb('sources').$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+  model: text('model'),
+  computedAt: timestamp('computed_at', { withTimezone: true }).notNull().defaultNow(),
+});

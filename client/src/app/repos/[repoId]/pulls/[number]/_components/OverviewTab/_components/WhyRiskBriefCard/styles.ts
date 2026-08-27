@@ -1,0 +1,82 @@
+import type { CSSProperties } from "react";
+
+export const s = {
+  card: {
+    border: "1px solid var(--border)",
+    borderRadius: 8,
+    background: "var(--bg-elevated)",
+    padding: 18,
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+  } satisfies CSSProperties,
+  block: { display: "flex", flexDirection: "column", gap: 4 } satisfies CSSProperties,
+  blockTitle: {
+    fontSize: 12,
+    fontWeight: 700,
+    letterSpacing: "0.05em",
+    textTransform: "uppercase",
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  bodyText: {
+    fontSize: 14,
+    lineHeight: 1.55,
+    color: "var(--text-primary)",
+    margin: 0,
+  } satisfies CSSProperties,
+  levelRow: { display: "flex", alignItems: "center", gap: 8 } satisfies CSSProperties,
+  focusList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  } satisfies CSSProperties,
+  focusButton: {
+    display: "flex",
+    gap: 8,
+    alignItems: "baseline",
+    width: "100%",
+    textAlign: "left",
+    background: "none",
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    padding: "8px 10px",
+    cursor: "pointer",
+    font: "inherit",
+    color: "var(--text-secondary)",
+    lineHeight: 1.45,
+  } satisfies CSSProperties,
+  focusRef: {
+    flexShrink: 0,
+    fontSize: 12,
+    color: "var(--text-muted)",
+  } satisfies CSSProperties,
+  focusReason: { fontSize: 13 } satisfies CSSProperties,
+  truncNote: { fontSize: 12, color: "var(--text-muted)" } satisfies CSSProperties,
+  sources: { fontSize: 11, color: "var(--text-muted)" } satisfies CSSProperties,
+  footer: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    justifyContent: "space-between",
+    borderTop: "1px solid var(--border)",
+    paddingTop: 14,
+    flexWrap: "wrap",
+  } satisfies CSSProperties,
+  updatedNotice: {
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "var(--warn-bg)",
+    color: "var(--warn)",
+    borderRadius: 6,
+    padding: "8px 10px",
+    fontSize: 13,
+  } satisfies CSSProperties,
+  /** Badge ships `white-space: nowrap`; the risk-level label is short, but keep
+   *  the sanctioned override consistent with IntentCard for model-adjacent
+   *  chips (no `vendor/ui` fork). */
+  levelBadge: { whiteSpace: "normal" } satisfies CSSProperties,
+} as const;

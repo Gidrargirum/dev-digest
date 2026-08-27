@@ -42,7 +42,8 @@
     "postedToGitHub": "Posts to GitHub immediately",
     "outdatedTitle": "{count} comment(s) on older revisions",
     "unanchoredTitle": "{count} finding(s) not shown on a diff line",
-    "largeBadge": "LARGE · {lines} lines"
+    "largeBadge": "LARGE · {lines} lines",
+    "targetLineUnavailable": "Exact line unavailable — showing the file"
   },
   "smartDiff": {
     "normalMode": "Normal",

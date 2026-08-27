@@ -167,3 +167,51 @@ export const PrBrief = z.object({
   history: PrHistory,
 });
 export type PrBrief = z.infer<typeof PrBrief>;
+
+// ---- Why + Risk Brief (pr_why_risk_brief) — separate from PrBrief above ----
+// New contract for the L05 "Why + Risk Brief" feature (spec
+// 2026-08-27-pr-why-risk-brief). Deliberately NOT a reshape of `PrBrief` /
+// `pr_brief`: different table (`pr_why_risk_brief`, carries a state key), a
+// single structured model call, and grounded path/line/endpoint references.
+export const RiskLevel = z.enum(['high', 'medium', 'low']); // AC-15
+export type RiskLevel = z.infer<typeof RiskLevel>;
+
+export const BriefRisk = z.object({
+  title: z.string(),
+  detail: z.string().nullish(),
+  path: z.string().nullable(), // grounded (AC-12) or null
+  line: z.number().int().nullable(), // grounded (AC-13) or null
+  endpoint: z.string().nullable(), // grounded against blast set; null on AC-18 path
+});
+export type BriefRisk = z.infer<typeof BriefRisk>;
+
+export const BriefReviewFocus = z.object({
+  path: z.string(),
+  line: z.number().int(),
+  reason: z.string(),
+});
+export type BriefReviewFocus = z.infer<typeof BriefReviewFocus>;
+
+export const PrWhyRiskBrief = z.object({
+  pr_id: z.string(),
+  what: z.string(),
+  why: z.string(),
+  risk_level: RiskLevel,
+  risks: z.array(BriefRisk),
+  review_focus: z.array(BriefReviewFocus),
+  risks_total: z.number().int(), // pre-truncation count (AC-16 -> AC-35)
+  review_focus_total: z.number().int(), // pre-truncation count (AC-16 -> AC-35)
+  sources: z.array(z.string()), // which inputs contributed (AC-17)
+  pr_state_key: z.string(), // AC-4
+  model: z.string().nullable(), // "<provider>/<model>"
+  computed_at: z.string(), // ISO-8601
+});
+export type PrWhyRiskBrief = z.infer<typeof PrWhyRiskBrief>;
+
+export const PrWhyRiskBriefResponse = z.object({ brief: PrWhyRiskBrief.nullable() }); // AC-20
+export type PrWhyRiskBriefResponse = z.infer<typeof PrWhyRiskBriefResponse>;
+
+export const PrWhyRiskBriefRegenerateResponse = z.object({
+  status: z.enum(['started', 'running']), // AC-8 / AC-21
+});
+export type PrWhyRiskBriefRegenerateResponse = z.infer<typeof PrWhyRiskBriefRegenerateResponse>;

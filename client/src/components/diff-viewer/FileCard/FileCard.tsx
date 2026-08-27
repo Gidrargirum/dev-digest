@@ -16,6 +16,7 @@ import {
   type DiffCommentApi,
 } from "../comments";
 import { partitionMarks, marksForLine, as, type DiffAnnotationApi } from "../annotations";
+import { resolveTarget, ts, TARGET_LINE_ID, type DiffTargetApi } from "../targeting";
 import { s, chevronFor } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
@@ -36,16 +37,39 @@ export function FileCard({
   file,
   commenting,
   annotations,
+  targeting,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   annotations?: DiffAnnotationApi;
+  targeting?: DiffTargetApi;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+
+  // Line addressing (spec 2026-08-27). `TargetState` is computed during render
+  // from props + `lines` — never stored via useEffect (that would be derived
+  // state). When this file is targeted the card is forced open even if a large
+  // file would otherwise collapse under AUTO_EXPAND_MAX_LINES (AC-28).
+  const targetState = resolveTarget(file.path, lines, targeting);
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const isOpen = open || targetState !== "none";
+
+  React.useEffect(() => {
+    if (targetState === "none") return;
+    // Synchronizing with an external system (the DOM scroll position) — the
+    // legitimate useEffect case.
+    const id = window.setTimeout(() => {
+      const anchoredEl =
+        targetState === "anchored" ? document.getElementById(TARGET_LINE_ID) : null;
+      (anchoredEl ?? cardRef.current)?.scrollIntoView({ block: "center", behavior: "smooth" });
+      targeting?.onResolved?.(targetState === "anchored" ? "anchored" : "unanchored");
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [targetState, targeting]);
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -75,9 +99,9 @@ export function FileCard({
   const isLarge = !!annotations && isLargeFile(file, annotations.largeFileLines);
 
   return (
-    <div style={isLarge ? { ...s.fileCard, ...s.fileCardLarge } : s.fileCard}>
+    <div ref={cardRef} style={isLarge ? { ...s.fileCard, ...s.fileCardLarge } : s.fileCard}>
       <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
-        <Icon.ChevronRight size={13} style={chevronFor(open)} />
+        <Icon.ChevronRight size={13} style={chevronFor(isOpen)} />
         <Icon.FileText size={14} style={s.fileIcon} />
         <span className="mono" style={s.filePath}>
           {file.path}
@@ -101,7 +125,7 @@ export function FileCard({
           </span>
         )}
       </div>
-      {open && (
+      {isOpen && (
         <div style={s.fileBody}>
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
@@ -115,6 +139,11 @@ export function FileCard({
                 commenting={commenting}
                 marks={marksForLine(ln, anchoredMarks)}
                 annotations={annotations}
+                isTarget={
+                  targetState === "anchored" &&
+                  targeting?.line != null &&
+                  (ln.newNo === targeting.line || ln.oldNo === targeting.line)
+                }
               />
             ))
           )}
@@ -126,6 +155,12 @@ export function FileCard({
               </span>
               <FindingMarks marks={unanchoredMarks} onOpenFinding={annotations.onOpenFinding} />
             </div>
+          )}
+          {/* The deep-link target line fell outside every rendered hunk (or the
+              patch is absent): say so in the card footer, next to the
+              unanchored finding-chip block, per AC-29's precedent. */}
+          {targetState === "unanchored" && (
+            <div style={ts.unanchoredNote}>{t("diffViewer.targetLineUnavailable")}</div>
           )}
         </div>
       )}

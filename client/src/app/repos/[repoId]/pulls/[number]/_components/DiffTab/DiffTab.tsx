@@ -4,6 +4,7 @@ import React from "react";
 import { useTranslations } from "next-intl";
 import { SectionLabel, Button } from "@devdigest/ui";
 import { DiffViewer, type DiffCommentApi } from "@/components/diff-viewer";
+import type { DiffTarget } from "@/lib/hooks/diff-target";
 import { usePrComments, useCreatePrComment } from "@/lib/hooks/reviews";
 import { notify } from "@/lib/toast";
 import type { PrFile, ReviewRecord } from "@devdigest/shared";
@@ -23,6 +24,8 @@ interface DiffTabProps {
   /** Owned by page.tsx, kept in `?diffMode=` so it survives a round trip
    *  through the Agent runs tab. Defaults to "normal" (see ./constants). */
   diffMode: DiffMode;
+  /** A file/line to scroll to in the diff (Review Focus deep-link, AC-28). */
+  target?: DiffTarget | null;
   onSetDiffMode: (mode: DiffMode) => void;
   /** Deep-links straight to the finding's card — routed through page.tsx's
    *  batched `setParams` (tab + finding + clearing diffMode in one replace). */
@@ -36,6 +39,7 @@ export function DiffTab({
   reviews,
   canComment,
   diffMode,
+  target,
   onSetDiffMode,
   onOpenFinding,
 }: DiffTabProps) {
@@ -112,10 +116,15 @@ export function DiffTab({
             })
           : t("smartDiff.filesSummary", { count: filesCount })}
       </SectionLabel>
-      {diffMode === "smart" ? (
+      {diffMode === "smart" && !target ? (
         <SmartDiffView files={files} reviews={reviews} onOpenFinding={onOpenFinding} />
       ) : (
-        <DiffViewer files={files} commenting={commenting} />
+        // A line is not addressable in smart mode — a target forces normal.
+        <DiffViewer
+          files={files}
+          commenting={commenting}
+          targeting={target ?? undefined}
+        />
       )}
     </section>
   );

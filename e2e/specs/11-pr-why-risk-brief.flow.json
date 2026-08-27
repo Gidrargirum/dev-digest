@@ -1,0 +1,15 @@
+{
+  "name": "PR Overview renders the Why + Risk Brief card and its not-generated state",
+  "description": "From PR #482, the Overview tab (default) mounts the Why + Risk Brief card. Seed data has no pr_why_risk_brief row, so GET /pulls/:id/brief returns { brief: null } and the card shows its explicit 'not generated yet' state with a regenerate affordance (AC-33). Read-only seeded data — the regenerate button is asserted but never clicked (a click would trigger a model call, forbidden here). Assumes a freshly-seeded DB where acme/payments-api (PR #482) is the first repo — guaranteed by e2e-web.yml; run locally via the hermetic stack (see e2e/README.md).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    { "cmd": ["wait", "--text", "Add rate limiting to public API endpoints"], "label": "seeded PR title row is visible" },
+    { "cmd": ["find", "text", "Add rate limiting to public API endpoints", "click"], "label": "open the PR row" },
+    { "cmd": ["wait", "--url", "/pulls/482"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
+    { "cmd": ["wait", "--text", "Why + Risk Brief"], "label": "the Why + Risk Brief card is mounted on Overview" },
+    { "cmd": ["wait", "--text", "No brief generated yet"], "label": "no seeded brief -> explicit not-generated state (AC-33)" },
+    { "cmd": ["wait", "--text", "Generate brief"], "label": "the regenerate affordance is present (not clicked - would call the model)" }
+  ]
+}

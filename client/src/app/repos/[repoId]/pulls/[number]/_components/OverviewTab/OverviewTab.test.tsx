@@ -13,6 +13,14 @@ vi.mock("@/lib/hooks/reviews", () => ({
   usePrIntent: () => ({ data: intent }),
 }));
 
+// The Why + Risk Brief card (Overview's left column, above Description) reaches
+// its data through this hook — mock it or it throws for lack of a QueryClient
+// in this render tree, exactly like usePrBlast below.
+vi.mock("@/lib/hooks/brief", () => ({
+  usePrWhyRiskBrief: () => ({ data: undefined, isLoading: false, isError: false, refetch: vi.fn() }),
+  useRegeneratePrBrief: () => ({ mutate: vi.fn(), isPending: false, error: null }),
+}));
+
 // BlastRadiusCard (Overview's right column) calls usePrBlast on its own —
 // mock it too, or it throws for lack of a QueryClient/mock in this render tree.
 vi.mock("@/lib/hooks/blast", () => ({
