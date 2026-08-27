@@ -418,3 +418,12 @@ the demo.
 | default roots = `docs`/`specs`/`insights` | server-unit (config) |
 | `sourceTagFor` is segment-based | server-unit (`helpers.test.ts`) |
 | real project `.md` files appear in the catalog | manual / server-integration |
+
+### Note — the catalog reflects the *cloned working copy*
+
+The reader scans `server/clones/<owner>/<repo>` on disk, not the upstream
+default branch. A clone left on an old commit shows that commit's `.md`
+files. `git`-side resync (`git -C <clone> fetch && reset --hard origin/main
+&& git clean -fd -e node_modules`) does **not** run automatically on every
+request — it happens on the existing repo-resync path. For a demo, make sure
+the clone is on a branch that actually has `docs/`, `specs/`, `insights/`.
