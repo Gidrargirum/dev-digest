@@ -49,7 +49,7 @@ export interface ContextDocEntry {
 export interface ContextDocsReader {
   /**
    * Recursively list `.md` files under `searchRoots` (each repo-relative,
-   * e.g. `.devdigest/specs`) inside `root` (the repo's clone path). Never
+   * e.g. `docs`, `specs`) inside `root` (the repo's clone path). Never
    * throws — any filesystem error degrades to `[]`.
    */
   list(root: string, searchRoots: string[]): Promise<ContextDocEntry[]>;

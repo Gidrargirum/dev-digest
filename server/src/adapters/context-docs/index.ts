@@ -1,6 +1,8 @@
 /**
- * Project Context Folder — filesystem reader/writer for
- * `.devdigest/{specs,docs,insights}/**\/*.md`.
+ * Project Context Folder — filesystem reader/writer for the repository's own
+ * documentation directories (`config.contextSearchRoots`, default
+ * `docs` / `specs` / `insights`; amended 2026-08-27) — every `**\/*.md` under
+ * them.
  *
  * `list()` never throws (AC-5/US-6: a broken/missing clone degrades to an
  * empty catalog, never a 500). `read()` DOES throw on anything outside the

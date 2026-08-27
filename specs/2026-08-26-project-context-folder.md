@@ -372,9 +372,49 @@ above — this list remains only as a log of the decisions made.
    `Specs read` row, in addition to the aggregate `Tokens` in Stats.
 6. **Fate of an attachment to a missing file (AC-21)** — stays as "broken"
    with a visible marker until the user detaches it.
-7. **Catalog search roots (AC-2)** — the tool's own dedicated folder
+7. **Catalog search roots (AC-2)** — ~~the tool's own dedicated folder
    `.devdigest/{specs,docs,insights}/` at the repository root, not the
-   repository's own `specs|docs|insights` folders directly.
+   repository's own `specs|docs|insights` folders directly.~~
+   **Superseded — see Amendment 1 (2026-08-27).**
 8. **Attachment scope (Edge cases)** — per (agent, repository) pair.
 9. **"Used by N agents" badge and "COVERAGE" ring (des1)** — "Used by N" is
    in scope (AC-23); "COVERAGE" is out of scope (Non-goals).
+
+## Amendment 1 — catalog search roots (2026-08-27)
+
+**Status:** approved · **Amends:** AC-1, AC-2, AC-5, decision 7 · **Reason:**
+the stakeholder requirement is that the **Project Context** screen lists the
+`.md` files that *actually exist in the project* ("список усіх .md файлів, які
+є у вашому проєкті"). A dedicated `.devdigest/{specs,docs,insights}/` folder
+does not exist in a normal repository, so the original decision produced an
+empty screen for every real repo and forced hand-planted fixture files for
+the demo.
+
+### Changes
+
+- **AC-2 (revised)** — The system shall take search roots from configuration
+  (`CONTEXT_SEARCH_ROOTS`, comma-separated, repo-relative), with the default
+  being the repository's own documentation directories: **`docs`, `specs`,
+  `insights`** (each scanned recursively for `**/*.md`, at any depth,
+  including package-level `server/docs`, `client/docs`, … when a root name
+  matches). It is **no longer** `.devdigest/…`.
+- **AC-1 (unchanged in shape)** — the `source` tag is now derived from the
+  path's segments (`specs/…` → `specs`, `…/docs/…` → `docs`, otherwise
+  `insights`) rather than a `.devdigest/` prefix. Both layouts resolve
+  correctly during any transition.
+- **AC-5 (unchanged)** — the empty state still applies when a repository
+  genuinely has no `.md` under the configured roots; it is simply far rarer
+  now.
+- **Out of scope for this amendment** — single-file roots (e.g. a top-level
+  `README.md`): the reader walks directories only. Add later if wanted.
+- **No contract change** — the `/repos/:id/context/docs` response shape,
+  every attachment route, and the run-executor path are untouched; only the
+  set of paths the reader returns changes.
+
+### Traceability
+
+| Change | Verification |
+|---|---|
+| default roots = `docs`/`specs`/`insights` | server-unit (config) |
+| `sourceTagFor` is segment-based | server-unit (`helpers.test.ts`) |
+| real project `.md` files appear in the catalog | manual / server-integration |

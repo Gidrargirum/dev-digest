@@ -185,7 +185,7 @@ export class Container {
     return this._tokenizer;
   }
 
-  /** Project Context Folder — filesystem reader for `.devdigest/{specs,docs,insights}`. */
+  /** Project Context Folder — filesystem reader for the repo's doc roots (`config.contextSearchRoots`). */
   get contextDocs(): ContextDocsReader & ContextDocsWriter {
     if (this.overrides.contextDocs) return this.overrides.contextDocs;
     this._contextDocs ??= new FsContextDocsReader();

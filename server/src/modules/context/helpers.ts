@@ -109,15 +109,18 @@ export interface OrderedDoc {
 }
 
 /**
- * Derive a document's source tag from its repo-relative path
- * (`.devdigest/specs/… → 'specs'`). Falls back to `'insights'` for anything
- * under a search root that isn't `specs`/`docs` — the catalog only ever
- * contains paths returned by the reader's configured search roots, so this
- * is a closed set in practice.
+ * Derive a document's source tag from its repo-relative path by its path
+ * segments (`specs/architecture.md → 'specs'`, `server/docs/di.md → 'docs'`).
+ * Falls back to `'insights'` for anything that is under a search root but names
+ * neither `specs` nor `docs` — the catalog only ever contains paths returned by
+ * the reader's configured search roots, so this is a closed set in practice.
+ * Segment-based rather than prefix-based so it works for both the current doc
+ * roots and the legacy `.devdigest/{specs,docs,insights}` layout.
  */
 export function sourceTagFor(path: string): ContextDocSource {
-  if (path.startsWith('.devdigest/specs/')) return 'specs';
-  if (path.startsWith('.devdigest/docs/')) return 'docs';
+  const segments = path.split('/');
+  if (segments.includes('specs')) return 'specs';
+  if (segments.includes('docs')) return 'docs';
   return 'insights';
 }
 

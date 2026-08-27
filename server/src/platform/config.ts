@@ -68,15 +68,18 @@ export type AppConfig = {
 };
 
 /**
- * Default search roots (AC-2) — the single source of truth. `ContextService`
- * imports this directly as its constructor default, so a test/caller that
- * constructs the service without a container still gets the same roots.
+ * Default search roots (AC-2, amended 2026-08-27) — the single source of truth.
+ * `ContextService` imports this directly as its constructor default, so a
+ * test/caller that constructs the service without a container still gets the
+ * same roots.
+ *
+ * These are the repository's own documentation directories, not a tool-specific
+ * `.devdigest/` folder: the Project Context screen must list the `.md` files
+ * that actually exist in the project (see the amendment in
+ * `specs/2026-08-26-project-context-folder.md`). Override per deployment with
+ * `CONTEXT_SEARCH_ROOTS` (comma-separated, repo-relative).
  */
-export const DEFAULT_CONTEXT_SEARCH_ROOTS = [
-  '.devdigest/specs',
-  '.devdigest/docs',
-  '.devdigest/insights',
-];
+export const DEFAULT_CONTEXT_SEARCH_ROOTS = ['docs', 'specs', 'insights'];
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
