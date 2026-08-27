@@ -13,7 +13,7 @@ vi.mock("@/lib/hooks/reviews", () => ({
   usePrIntent: () => ({ data: intent }),
 }));
 
-// The Why + Risk Brief card (Overview's left column, above Description) reaches
+// The PR Brief card (Overview's left column, above Description) reaches
 // its data through this hook — mock it or it throws for lack of a QueryClient
 // in this render tree, exactly like usePrBlast below.
 vi.mock("@/lib/hooks/brief", () => ({

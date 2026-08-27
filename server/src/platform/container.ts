@@ -41,6 +41,7 @@ import { BriefRepository } from '../modules/brief/repository.js';
 import { getFeatureModelOverride, resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import type { PinoLike } from './run-logger.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -68,6 +69,11 @@ export interface ContainerOverrides {
   blast?: BlastPort;
   /** Why + Risk Brief facade — tests inject a mock BriefPort implementation. */
   brief?: BriefPort;
+  /**
+   * Structured logger for background work that runs outside a request (the
+   * `brief.compute` job). `app.ts` passes `app.log`; tests may leave it unset.
+   */
+  logger?: PinoLike;
 }
 
 export class Container {
@@ -205,6 +211,7 @@ export class Container {
         llm: (provider) => this.llm(provider),
         featureModel: (workspaceId) => resolveFeatureModel(this.db, workspaceId, 'risk_brief'),
         intent: (workspaceId, prId) => this.intent.get(workspaceId, prId),
+        logger: this.overrides.logger,
       },
       new BriefRepository(this.db),
       this.jobs,

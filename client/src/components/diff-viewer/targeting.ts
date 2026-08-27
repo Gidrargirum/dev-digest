@@ -1,6 +1,6 @@
 /* Diff line-addressing — the anti-corruption layer between the diff viewer
    (this shared component) and the app-level features that address a file/line
-   (the Why + Risk Brief's Review Focus block, and any future deep-link).
+   (the PR Brief's Review Focus block, and any future deep-link).
 
    Built exactly like the neighbouring `annotations.ts`: `src/components/` may
    not import from `src/app/**`, so this layer declares its own minimal types

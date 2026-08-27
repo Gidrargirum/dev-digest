@@ -33,7 +33,7 @@ export function OverviewTab({
 }: OverviewTabProps) {
   const { data: intent } = usePrIntent(prId);
   // The single access point for brief data (AC-34). `risks[]` render only in
-  // the Intent block (AC-25); the Why + Risk Brief card never renders them.
+  // the Intent block (AC-25); the PR Brief card never renders them.
   const { data: brief } = usePrWhyRiskBrief(prId);
   const risks = brief?.brief?.risks;
   const risksTotal = brief?.brief?.risks_total;

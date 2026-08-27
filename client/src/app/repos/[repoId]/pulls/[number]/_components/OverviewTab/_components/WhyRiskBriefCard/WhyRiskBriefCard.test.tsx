@@ -80,7 +80,7 @@ describe("WhyRiskBriefCard", () => {
     );
 
     // Skeleton: the frame is there, but neither content nor an error alert.
-    expect(screen.getByText("Why + Risk Brief")).toBeInTheDocument();
+    expect(screen.getByText("PR Brief")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.queryByText(/token-bucket/)).not.toBeInTheDocument();
 
@@ -93,7 +93,7 @@ describe("WhyRiskBriefCard", () => {
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     // The card itself did not disappear (AC-32).
-    expect(screen.getByText("Why + Risk Brief")).toBeInTheDocument();
+    expect(screen.getByText("PR Brief")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(refetch).toHaveBeenCalledTimes(1);
   });

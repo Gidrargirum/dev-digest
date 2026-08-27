@@ -20,6 +20,12 @@ export const MAX_REGEN = 3;
  *  (same order of magnitude as `INTENT_TIMEOUT_MS`). */
 export const BRIEF_TIMEOUT_MS = 20_000;
 
+/** Hard wall-clock ceiling on the whole `compute` job (DB reads + grounding +
+ *  the LLM call and any provider-side retries). A backstop for providers that
+ *  do not honour `BRIEF_TIMEOUT_MS` on the request itself — keeps a hung call
+ *  from holding a JobRunner slot until its 120s outer timeout. */
+export const BRIEF_COMPUTE_TIMEOUT_MS = 60_000;
+
 /** Linked-issue references parsed from the PR body (mirrors the intent module). */
 export const MAX_LINKED_ISSUES = 3;
 

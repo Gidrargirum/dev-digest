@@ -1,4 +1,4 @@
-/* WhyRiskBriefCard — the Why + Risk Brief on the Overview tab
+/* WhyRiskBriefCard — the PR Brief on the Overview tab
    (spec 2026-08-27-pr-why-risk-brief). Renders `what`, `why`, the risk-level
    indicator and the Review Focus block. `risks[]` is NOT rendered here (AC-24)
    — its only home is the Intent block. Brief text is rendered as plain text

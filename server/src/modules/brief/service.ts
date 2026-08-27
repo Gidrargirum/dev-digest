@@ -2,7 +2,9 @@ import { z } from 'zod';
 import { wrapUntrusted } from '@devdigest/reviewer-core';
 import type { FeatureModelChoice, PrWhyRiskBrief } from '@devdigest/shared';
 import { RiskLevel } from '@devdigest/shared';
+import { withTimeout } from '../../platform/resilience.js';
 import {
+  BRIEF_COMPUTE_TIMEOUT_MS,
   BRIEF_JOB_KIND,
   BRIEF_SCHEMA_NAME,
   BRIEF_TIMEOUT_MS,
@@ -146,18 +148,26 @@ export class BriefService implements BriefPort {
     prId: string,
     opts: { force?: boolean } = {},
   ): Promise<void> {
-    await this.jobs.enqueue(workspaceId, BRIEF_JOB_KIND, {
+    const job = await this.jobs.enqueue(workspaceId, BRIEF_JOB_KIND, {
       workspaceId,
       prId,
       force: opts.force ?? false,
     } satisfies BriefComputeParams);
+    // The handler swallows its own errors (AC-2), but JobRunner still rejects
+    // `job.done` when the OUTER timeout/retry gives up on a hung LLM call. Nobody
+    // awaits `done` (this is a background trigger), so an unhandled rejection
+    // would crash the process — detach it explicitly (mirrors
+    // `ConventionsService`'s `job.done.catch(() => undefined)`).
+    job.done.catch(() => undefined);
   }
 
   /** Job-handler body — entirely inside try/catch (AC-2). */
   private async compute(params: BriefComputeParams): Promise<void> {
     const { workspaceId, prId } = params;
     if (this.#inFlight.has(prId)) return;
-    const run = this.#run(params);
+    // Bound the whole job: a provider that ignores `BRIEF_TIMEOUT_MS` on the
+    // request would otherwise hang here until JobRunner's 120s outer timeout.
+    const run = withTimeout(this.#run(params), BRIEF_COMPUTE_TIMEOUT_MS);
     this.#inFlight.set(prId, run);
     try {
       await run;

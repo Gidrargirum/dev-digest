@@ -98,7 +98,7 @@ function makeHarness(opts: {
     register: (_kind, h) => {
       handler = h;
     },
-    enqueue: async () => ({ id: 'job-1' }),
+    enqueue: async () => ({ id: 'job-1', done: Promise.resolve() }),
   };
 
   const service = new BriefService(deps, repo, jobs);

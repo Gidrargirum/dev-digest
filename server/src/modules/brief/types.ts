@@ -46,7 +46,11 @@ export interface BriefDeps {
  *  is the only place `this.jobs` is assigned to this type. */
 export interface BriefJobs {
   register(kind: string, handler: (payload: unknown) => Promise<void>): void;
-  enqueue(workspaceId: string, kind: string, payload: unknown): Promise<unknown>;
+  enqueue(
+    workspaceId: string,
+    kind: string,
+    payload: unknown,
+  ): Promise<{ id: string; done: Promise<void> }>;
 }
 
 /**

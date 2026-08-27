@@ -131,7 +131,7 @@
     "risksShowing": "Showing {shown} of {total}"
   },
   "whyRiskBrief": {
-    "title": "Why + Risk Brief",
+    "title": "PR Brief",
     "what": "What",
     "why": "Why",
     "riskLevel": "Risk level",
@@ -149,7 +149,7 @@
     "updatedTitle": "Brief updated",
     "updatedAction": "Show the new brief",
     "notGeneratedTitle": "No brief generated yet",
-    "notGeneratedBody": "A Why + Risk Brief has not been generated for this pull request yet.",
+    "notGeneratedBody": "A PR Brief has not been generated for this pull request yet.",
     "generate": "Generate brief",
     "errorTitle": "Couldn’t load the brief",
     "retry": "Retry",

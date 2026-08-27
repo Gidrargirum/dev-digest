@@ -66,7 +66,7 @@ function risk(over: Partial<BriefRisk> = {}): BriefRisk {
   return { title: "Race on the token bucket", detail: null, path: "src/limiter.ts", line: 20, endpoint: null, ...over };
 }
 
-describe("IntentCard — risks[] from the Why + Risk Brief (AC-25)", () => {
+describe("IntentCard — risks[] from the PR Brief (AC-25)", () => {
   it("renders risks below Out of scope and above the confidence footer, each with its path:line reference", () => {
     renderWithIntl(
       <IntentCard
