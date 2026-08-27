@@ -13,6 +13,23 @@ vi.mock("@/lib/hooks/reviews", () => ({
   usePrIntent: () => ({ data: intent }),
 }));
 
+// BlastRadiusCard (Overview's right column) calls usePrBlast on its own —
+// mock it too, or it throws for lack of a QueryClient/mock in this render tree.
+vi.mock("@/lib/hooks/blast", () => ({
+  usePrBlast: () => ({
+    data: {
+      status: "ok",
+      reason: null,
+      blast: { changed_symbols: [], downstream: [], summary: "0 symbols" },
+      counts: { symbols: 0, callers: 0, endpoints: 0, crons: 0 },
+      prior_prs: [],
+    },
+    isLoading: false,
+    isError: false,
+    refetch: vi.fn(),
+  }),
+}));
+
 import { OverviewTab } from "./OverviewTab";
 
 beforeEach(() => {
@@ -72,5 +89,12 @@ describe("OverviewTab", () => {
       Node.DOCUMENT_POSITION_FOLLOWING,
     );
     expect(container).toBeTruthy();
+  });
+
+  it("renders the Blast Radius card in the right column alongside the description", () => {
+    renderWithIntl(<OverviewTab prId="pr1" prBody="Adds a dark mode toggle to Settings." />);
+
+    expect(screen.getByText("Blast Radius")).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: /impact counts/i })).toBeInTheDocument();
   });
 });

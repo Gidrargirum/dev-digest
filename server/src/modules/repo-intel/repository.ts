@@ -436,6 +436,20 @@ export class RepoIntelRepository {
       .where(eq(t.fileEdges.repoId, repoId));
   }
 
+  /**
+   * Files that import any of `files` — one reverse hop. Served by the
+   * `file_edges_repo_to_idx` index on `(repo_id, to_file)`; a targeted `IN`
+   * query rather than `getEdges` (which pulls the whole repo's edge set).
+   * Used by blast's depth-2 endpoint discovery.
+   */
+  async getImportersOf(repoId: string, files: string[]): Promise<IndexerEdgeRow[]> {
+    if (files.length === 0) return [];
+    return this.db
+      .select({ fromFile: t.fileEdges.fromFile, toFile: t.fileEdges.toFile })
+      .from(t.fileEdges)
+      .where(and(eq(t.fileEdges.repoId, repoId), inArray(t.fileEdges.toFile, files)));
+  }
+
   /** `{path, percentile}` for the given paths (smart-diff / run-executor). */
   async getFileRankFor(repoId: string, paths: string[]): Promise<FileRankRow[]> {
     if (paths.length === 0) return [];
