@@ -29,6 +29,10 @@ const EnvSchema = z.object({
   API_PORT: z.coerce.number().int().default(3001),
   WEB_PORT: z.coerce.number().int().default(3000),
   DEVDIGEST_CLONE_DIR: z.string().optional(),
+  // Project Context Folder (AC-2): the tool's own dedicated folder at the
+  // repository root, never the repo's own top-level specs/docs/insights.
+  // Comma-separated, repo-relative to a repo's clone root.
+  CONTEXT_SEARCH_ROOTS: z.string().optional(),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   // `.env` (and .env.example) ship `LOG_LEVEL=` empty; an empty string is not a
   // valid enum member, so coerce '' → undefined to fall through to the default.
@@ -59,7 +63,20 @@ export type AppConfig = {
    * EXACTLY like the ripgrep-only baseline.
    */
   repoIntelEnabled: boolean;
+  /** Repo-relative search roots for the Project Context Folder catalog (AC-2). */
+  contextSearchRoots: string[];
 };
+
+/**
+ * Default search roots (AC-2) — the single source of truth. `ContextService`
+ * imports this directly as its constructor default, so a test/caller that
+ * constructs the service without a container still gets the same roots.
+ */
+export const DEFAULT_CONTEXT_SEARCH_ROOTS = [
+  '.devdigest/specs',
+  '.devdigest/docs',
+  '.devdigest/insights',
+];
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   const parsed = EnvSchema.parse(env);
@@ -77,5 +94,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     webOrigin: `http://localhost:${parsed.WEB_PORT}`,
     embeddingsEnabled: parsed.EMBEDDINGS_ENABLED === 'true',
     repoIntelEnabled: parsed.REPO_INTEL_ENABLED !== 'false',
+    contextSearchRoots: parsed.CONTEXT_SEARCH_ROOTS
+      ? parsed.CONTEXT_SEARCH_ROOTS.split(',').map((s) => s.trim()).filter(Boolean)
+      : DEFAULT_CONTEXT_SEARCH_ROOTS,
   };
 }

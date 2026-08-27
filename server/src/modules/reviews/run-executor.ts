@@ -227,6 +227,12 @@ export class ReviewRunExecutor {
       // section when the array is empty.
       const skillBodies = await this.buildSkillBodies(agent.id, runLog);
 
+      // Project Context Folder (AC-11/16/21) — the agent's own attached
+      // documents merged with its enabled skills', resolved to strings.
+      // Best-effort: a failure degrades to no `## Project context` section,
+      // same omit-when-empty contract as callers/repoMap/skills.
+      const { specs, specsRead } = await this.buildProjectContext(agent.id, pull.repoId, runLog);
+
       // ---- Engine: assemble → single-pass → grounding -----------------------
       // The pure review pipeline lives in @devdigest/reviewer-core (shared with
       // the CI runner). The service owns only I/O: repo-intel context resolution
@@ -246,6 +252,9 @@ export class ReviewRunExecutor {
         ...(repoMap ? { repoMap } : {}),
         // Linked-skills-in-prompt: enabled links' bodies, same omit-when-empty contract.
         ...(skillBodies.length > 0 ? { skills: skillBodies } : {}),
+        // Project Context Folder — resolved document strings, same omit-when-empty
+        // contract (AC-14: an empty list assembles a byte-identical prompt).
+        ...(specs.length > 0 ? { specs } : {}),
         // PR author's description/body — untrusted; assemblePrompt wraps +
         // truncates it. Omitted when the PR has no body.
         ...(pull.body ? { prDescription: pull.body } : {}),
@@ -362,7 +371,7 @@ export class ReviewRunExecutor {
         ],
         raw_output: outcome.raw,
         memory_pulled: [],
-        specs_read: [],
+        specs_read: specsRead,
         // Persisted log = the run's FULL event buffer (incl. shared pre-work:
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
@@ -572,6 +581,49 @@ export class ReviewRunExecutor {
       return active.map((l) => l.skill.body);
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Project Context Folder (specs/2026-08-26-project-context-folder.md) —
+   * resolve the agent's attached documents (its own + its enabled skills',
+   * merged and deduped — AC-11) into `ReviewInput.specs` strings and the
+   * trace's `specs_read` lines (AC-18/21). Best-effort: its OWN try/catch,
+   * NOT `runLog.step()` — a `.step()` throw emits an 'error' event and
+   * re-throws, which paints the whole Live Log as failed for what is a
+   * best-effort enrichment stage (insights/INSIGHTS.md, 2026-08-19), exactly
+   * like `buildCallersDigest`/`buildRepoMapDigest` above. A failure here
+   * degrades to no `## Project context` section — never fails the run.
+   *
+   * Each resolved string leads with the document's repo-relative path (AC-13)
+   * so the agent can cite a specific document in a finding. `specsRead` lists
+   * successfully-read documents in insertion (= prompt) order, then any
+   * skipped documents as their own visible entries (AC-21) — never silently
+   * dropped.
+   */
+  private async buildProjectContext(
+    agentId: string,
+    repoId: string,
+    runLog: RunLogger,
+  ): Promise<{ specs: string[]; specsRead: string[] }> {
+    try {
+      const { ok, skipped } = await this.container.projectContext.resolveForRun(agentId, repoId);
+      if (ok.length === 0 && skipped.length === 0) return { specs: [], specsRead: [] };
+      const specs = ok.map((d) => `${d.path}\n\n${d.content}`);
+      const specsRead = [
+        ...ok.map((d) => `${d.path} · ≈${d.tokens} tokens`),
+        ...skipped.map((path) => `${path} · skipped (unreadable)`),
+      ];
+      if (ok.length > 0) runLog.info(`Project context: ${ok.length} document(s) attached`);
+      if (skipped.length > 0) {
+        runLog.info(`Project context: skipped ${skipped.length} unreadable/missing document(s)`);
+      }
+      return { specs, specsRead };
+    } catch (err) {
+      // Never let enrichment break the run — surface only as a Live Log info,
+      // same as the other best-effort digests in this file.
+      runLog.info(`Project context: resolution failed — ${(err as Error).message}`);
+      return { specs: [], specsRead: [] };
     }
   }
 

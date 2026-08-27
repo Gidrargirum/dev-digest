@@ -9,6 +9,8 @@ for features touching more than one package. Normative voice — "must",
 | [findings-severity-breakdown.md](./findings-severity-breakdown.md) | FINDINGS counters + hover popover on the PR list and the Agent runs timeline |
 | [conventions-extractor.md](./conventions-extractor.md) | Extracting house conventions from a repo and merging the accepted ones into a skill |
 | [pr-intent-layer.md](./pr-intent-layer.md) | Deriving a PR's intent/scope before review, caching it, and surfacing it in the prompt and the Overview tab |
+| [2026-08-26-project-context-folder.md](./2026-08-26-project-context-folder.md) | Attaching repo `.md` docs to agents/skills by hand, injecting them as untrusted `## Project context`, and showing them in the run trace (read/attach path; partially superseded below) |
+| [2026-08-27-project-context-folder-authoring.md](./2026-08-27-project-context-folder-authoring.md) | Authoring the Project Context folder — file tree, create/upload/edit `.md` documents, DB-backed persistence, and the COVERAGE indicator; supersedes the base spec's read-only Non-goals |
 
 ## What belongs here
 

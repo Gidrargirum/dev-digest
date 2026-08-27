@@ -10,6 +10,7 @@ import { Tabs, Badge, Icon, Skeleton, ErrorState } from "@devdigest/ui";
 import { useSkill } from "@/lib/hooks/skills";
 import { ConfigTab } from "./_components/ConfigTab";
 import { PreviewTab } from "./_components/PreviewTab";
+import { ProjectContextSection } from "./_components/ProjectContextSection";
 import { StatsTab } from "./_components/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab";
 import { VALID_TABS, type DetailTab } from "./constants";
@@ -54,6 +55,7 @@ export function SkillDetail({ skillId }: { skillId: string }) {
   const tabs = [
     { key: "config", label: t("detail.tabs.config"), icon: "Settings" as const },
     { key: "preview", label: t("detail.tabs.preview"), icon: "Eye" as const },
+    { key: "context", label: t("detail.tabs.context"), icon: "FileText" as const },
     { key: "stats", label: t("detail.tabs.stats"), icon: "BarChart" as const },
     { key: "versions", label: t("detail.tabs.versions"), icon: "History" as const },
   ];
@@ -76,6 +78,7 @@ export function SkillDetail({ skillId }: { skillId: string }) {
       <div style={s.body}>
         {tab === "config" && <ConfigTab skill={skill} />}
         {tab === "preview" && <PreviewTab skill={skill} />}
+        {tab === "context" && <ProjectContextSection skill={skill} />}
         {tab === "stats" && <StatsTab skillId={skill.id} />}
         {tab === "versions" && <VersionsTab skill={skill} />}
       </div>

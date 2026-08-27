@@ -96,6 +96,13 @@ Then classify every path into slices per the matrix.
 server-only branch. Every gate failure is CRITICAL and needs no verification in
 phase 5: a red `tsc` is not an opinion.
 
+Check [gates.md's *Gate cache*](gates.md#gate-cache--do-not-re-run-what-already-ran-on-this-worktree)
+first — if `implementer` (or an earlier run of this skill) already ran a gate
+on this exact fingerprint, cite the cached result instead of re-running it.
+Update `.claude/pr-self-review/gates-receipt.json` with whatever you end up
+actually running, real or cached, so it stays the current source of truth for
+the next agent.
+
 ### 3. Fan-out
 
 For each (skill × non-empty slice) pair from the matrix, spawn **one subagent,

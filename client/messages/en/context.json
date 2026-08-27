@@ -1,5 +1,6 @@
 {
   "title": "Project Context",
+  "subtitle": "Browse the repository's .md documents — attach them to an agent or a skill from its own editor.",
   "chunks": "{count} chunks",
   "reindex": "Re-index",
   "indexing": "Indexing…",
@@ -19,6 +20,68 @@
   "editor": {
     "loadError": "Couldn’t load spec",
     "save": "Save",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "label": "Document content",
+    "saved": "Saved · ≈ {count} tokens",
+    "unsaved": "Unsaved changes",
+    "saveError": "Couldn’t save this document"
+  },
+  "page": {
+    "crumbLab": "Project Context"
+  },
+  "searchPlaceholder": "Search documents…",
+  "table": {
+    "path": "Path",
+    "source": "Source",
+    "size": "Size",
+    "tokens": "Tokens",
+    "usedBy": "Used by"
+  },
+  "tokens": "≈ {count} tokens",
+  "usedBy": "Used by {count} agents",
+  "preview": {
+    "select": "Select a document to preview it.",
+    "loadError": "Couldn’t load this document"
+  },
+  "tree": {
+    "label": "Document tree",
+    "newDoc": "New document",
+    "newFolder": "New folder",
+    "upload": "Upload a .md file",
+    "refresh": "Refresh"
+  },
+  "create": {
+    "docTitle": "New document",
+    "folderTitle": "New folder",
+    "folderField": "Parent folder",
+    "nameField": "Name",
+    "docNameHint": "Ends in .md, under one of .devdigest/specs, /docs, /insights.",
+    "folderNameHint": "A path prefix under one of the search roots.",
+    "submitDoc": "Create document",
+    "submitFolder": "Create folder",
+    "creating": "Creating…",
+    "cancel": "Cancel"
+  },
+  "upload": {
+    "tooLarge": "That file is larger than the 1 MiB limit.",
+    "notMd": "Only .md files can be uploaded.",
+    "failed": "Upload failed"
+  },
+  "coverage": {
+    "label": "COVERAGE",
+    "caption": "{attached} of {total} workspace agents",
+    "noAgents": "No agents in this workspace"
+  },
+  "derivedNote": "Stored in DevDigest, not in this repository's git history.",
+  "storeError": "Couldn’t save",
+  "emptyState": {
+    "notCloned": {
+      "title": "Repository not cloned yet",
+      "body": "This repository hasn't been cloned yet, so its .md documents aren't available. Try again once cloning finishes."
+    },
+    "noDocs": {
+      "title": "No documents found",
+      "body": "No .md files under .devdigest/specs, .devdigest/docs, or .devdigest/insights in this repository."
+    }
   }
 }

@@ -35,6 +35,10 @@ import { IntentRepository } from '../modules/intent/repository.js';
 import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import type { ContextDocsReader, ContextDocsWriter } from '../ports/index.js';
+import { FsContextDocsReader } from '../adapters/context-docs/index.js';
+import { ContextRepository } from '../modules/context/repository.js';
+import { ContextService } from '../modules/context/service.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -59,6 +63,10 @@ export interface ContainerOverrides {
   tokenizer?: Tokenizer;
   /** Intent facade — tests inject a mock IntentPort implementation. */
   intent?: IntentPort;
+  /** Project Context Folder reader+writer — tests inject a mock implementation. */
+  contextDocs?: ContextDocsReader & ContextDocsWriter;
+  /** Project Context Folder service — tests inject a mock/stub ContextService. */
+  projectContext?: ContextService;
 }
 
 export class Container {
@@ -86,6 +94,8 @@ export class Container {
   private _tokenizer?: Tokenizer;
   private _priceBook?: PriceBook;
   private _intent?: IntentPort;
+  private _contextDocs?: ContextDocsReader & ContextDocsWriter;
+  private _projectContext?: ContextService;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -173,6 +183,30 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** Project Context Folder — filesystem reader for `.devdigest/{specs,docs,insights}`. */
+  get contextDocs(): ContextDocsReader & ContextDocsWriter {
+    if (this.overrides.contextDocs) return this.overrides.contextDocs;
+    this._contextDocs ??= new FsContextDocsReader();
+    return this._contextDocs;
+  }
+
+  /**
+   * Project Context Folder — catalog + attachment merge/resolve. Takes ports,
+   * not `this`, for the same cycle-avoidance reason as `repoIntel`/`intent`
+   * above (the container constructs it, so accepting `Container` would cycle).
+   */
+  get projectContext(): ContextService {
+    if (this.overrides.projectContext) return this.overrides.projectContext;
+    this._projectContext ??= new ContextService(
+      new ContextRepository(this.db),
+      this.contextDocs,
+      this.tokenizer,
+      this.config.contextSearchRoots,
+      this.contextDocs,
+    );
+    return this._projectContext;
   }
 
   /**

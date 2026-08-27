@@ -8,7 +8,7 @@ description: >-
   (`docs/` vs `specs/` vs `<package>/docs/`) and refuses to write to
   `insights/`. Use when something that has been built needs to be written
   up for readers. Do NOT use this agent to design a not-yet-built feature
-  (use `planner`), to write code, to review, or to record session-level
+  (use `implementation-planner`), to write code, to review, or to record session-level
   engineering conclusions (that is the `engineering-insights` skill).
   Always replies in the same language the request was written in.
 tools: Read, Write, Edit, Grep, Glob, Skill

@@ -14,15 +14,16 @@ prompt it receives.
 | Agent | Model | Tools | Preloaded skills | Does | Does not |
 |---|---|---|---|---|---|
 | [researcher](researcher.md) | sonnet | `Read, Grep, Glob, Bash, WebFetch, WebSearch, ToolSearch` | — | Answers one factual question with cited evidence — repo research, external research, or both | Write code, plan, decide |
-| [planner](planner.md) | opus | `Read, Grep, Glob, Bash, Skill` (+ `permissionMode: plan`) | all 18 | Turns a task into a Development Plan bound to this repo's constraints | Touch files, review, research the web |
+| [implementation-planner](implementation-planner.md) | opus | `Read, Grep, Glob, Bash, Skill` (+ `permissionMode: plan`) | all 18 | Turns a task into a Development Plan bound to this repo's constraints, checks requirements for gaps, recommends a better approach when one exists, asks single-agent vs multi-agent execution | Touch files, review, research the web, author or amend a `specs/` document |
 | [implementer](implementer.md) | sonnet | `Read, Edit, Write, Bash, Grep, Glob, Skill` | all 18 | Executes an approved plan across packages, runs the existing gates | Design, review, commit, open a PR |
 | [ui-test-writer](ui-test-writer.md) | sonnet | `Read, Edit, Write, Bash, Grep, Glob, Skill` | 1 | Writes and runs client (vitest/RTL) and e2e (flow.json) tests | Touch server/reviewer-core tests, fix production code, plan, review |
 | [api-test-writer](api-test-writer.md) | sonnet | `Read, Edit, Write, Bash, Grep, Glob, Skill` | 3 | Writes and runs server-unit, server-integration and reviewer-core tests | Touch client/e2e tests, fix production code, plan, review |
-| [architecture-reviewer](architecture-reviewer.md) | opus | `Read, Grep, Glob, Bash, Skill` (+ `permissionMode: plan`) | 2 | Reviews Onion/frontend-architecture ring placement and dependency direction; findings only | Write/edit, fix, propose a fix, replace `pr-self-review` |
-| [plan-verifier](plan-verifier.md) | opus | `Read, Grep, Glob, Bash` (+ `permissionMode: plan`) | — | Checks a Development Plan's requirement coverage against the actual diff | Write/edit, judge code quality, re-plan, trust a self-report as evidence |
+| [architecture-reviewer](architecture-reviewer.md) | sonnet | `Read, Grep, Glob, Bash, Skill` (+ `permissionMode: plan`) | 2 | Reviews Onion/frontend-architecture ring placement and dependency direction; findings only | Write/edit, fix, propose a fix, replace `pr-self-review` |
+| [plan-verifier](plan-verifier.md) | sonnet | `Read, Grep, Glob, Bash` (+ `permissionMode: plan`) | — | Checks a Development Plan's requirement coverage against the actual diff | Write/edit, judge code quality, re-plan, trust a self-report as evidence |
 | [doc-writer](doc-writer.md) | sonnet | `Read, Write, Edit, Grep, Glob, Skill` | 1 | Documents already-built functionality, routes it to `docs/`/`specs/`/`<package>/docs/`, adds Mermaid diagrams | Design unbuilt features, write code, review, write to `insights/` |
+| [spec-creator](spec-creator.md) | opus | `Read, Grep, Glob, WebFetch, Write, Edit, Skill, Agent` | 4 | Analyzes a design (Figma/screenshots/text/code) for gaps, corner cases, module interactions and UX improvements, delegates factual research to `researcher`, writes a traceable EARS-based spec to the correct `specs/` folder | Write implementation code, plan how to build it, edit a pre-existing spec, write outside `specs/` |
 
-`planner` and `implementer` preload an **identical** skill set — the full
+`implementation-planner` and `implementer` preload an **identical** skill set — the full
 catalog in [`.claude/skills/`](../skills/README.md). Symmetry is the point: the
 plan's skills table and the implementation's skill selection are drawn from the
 same loaded knowledge, so neither can cite a rule the other has not seen.
@@ -61,15 +62,16 @@ character** in both bodies. This is checked by a grep gate (see
 | Agent | Input | Output |
 |---|---|---|
 | `researcher` | A concrete question with a scope; otherwise it interviews you | Report: Conclusions · Evidence · References · Could not determine |
-| `planner` | A concrete task; otherwise it interviews you | `# Development Plan` — Scope · Constraints · Skills the implementer must invoke · Steps · Verification gates · Risks · Open questions |
+| `implementation-planner` | A concrete task; otherwise it interviews you | `# Development Plan` — Execution mode · Scope · Recommendations · Constraints · Skills the implementer must invoke · Steps · Verification gates · Risks · Open questions |
 | `implementer` | A Development Plan (or equally explicit steps); refuses without one | `# Implementation Report` — Steps completed · Skills invoked · Gates · Deviations · Not done · Concerns for review |
 | `ui-test-writer` | A concrete component/page/flow and its expected behavior | `## Test Report` — Tests written · Commands run · Red → green · Blocked — needs production change · Not covered |
 | `api-test-writer` | A concrete route/service/repository/adapter/reviewer-core target and its expected behavior | `## Test Report` — same sections as `ui-test-writer` |
 | `architecture-reviewer` | A diff range, branch, or file set | `## Architecture Review` — Verdict · Mechanical gates · Findings · Ring placement notes · Not reviewed |
 | `plan-verifier` | A plan's text plus a way to see the diff; an Implementation Report is optional and not evidence | `## Plan Verification` — Verdict · Requirement coverage · Gaps · Out of scope changes · Gates re-run · Could not verify |
 | `doc-writer` | A subject and an audience — usually a finished plan or Implementation Report | `## Documentation Report` — Written · Index updates · Proposed AGENTS.md pointer · Diagrams · Open questions |
+| `spec-creator` | A design source — a Figma link, screenshots, a text description, and/or the existing code — for a not-yet-built feature | `## Specification Report` — Written · Why this folder · Design sources analyzed · Blocking questions asked · Inline `[NEEDS CLARIFICATION]` left · Module interactions found · Proposed UX improvements · Index updated |
 
-The plan travels **as text through the main session**: `planner` returns it,
+The plan travels **as text through the main session**: `implementation-planner` returns it,
 you hand it to `implementer`. It is not persisted to a file, so the plan must
 be self-contained — `implementer` cannot see where it came from.
 
@@ -79,7 +81,7 @@ be self-contained — `implementer` cannot see where it came from.
 they are pointers:
 
 - [`.claude/skills/pr-self-review/routing.md`](../skills/pr-self-review/routing.md)
-  — the shared bridge. `planner` routes the paths it *expects* to change and
+  — the shared bridge. `implementation-planner` routes the paths it *expects* to change and
   emits a skills table; `implementer` re-routes the paths it *actually*
   changed (`git status --porcelain`) and reports where the two diverge. The
   plan is a forecast, the diff is the fact, and one matrix judges both — which
@@ -92,7 +94,7 @@ they are pointers:
 - Root [`CLAUDE.md`](../../CLAUDE.md) — repo-wide rules, the do-not-touch list
   (`docker compose down -v`, `vendor/**`, `clones/**`), the session protocol.
 - `specs/` — contracts and invariants that must keep holding.
-- `<package>/insights/INSIGHTS.md` — `planner` reads *What Doesn't Work* /
+- `<package>/insights/INSIGHTS.md` — `implementation-planner` reads *What Doesn't Work* /
   *Recurring Errors* so a plan does not repeat a measured failure;
   `implementer` is forbidden to write there (that is `engineering-insights`,
   at end of session).
@@ -123,12 +125,12 @@ they are pointers:
   tool, so both agents list theirs explicitly; the doc's own example of a good
   restrictive set is read-only `Read, Grep, Glob, Bash`. Context isolation
   (clean context, only the final summary returns) is why the output formats are
-  fixed. The planner/implementer split — read-only planner with
+  fixed. The implementation-planner/implementer split — read-only implementation-planner with
   `permissionMode: plan`, write-capable implementer, plan passed as a summary
   through the main conversation — is the documented pattern.
 - Same page, *System Prompt Recommendations* — the body layout: role statement →
   numbered workflow → checklist → output format → constraints.
-- [Skills](https://code.claude.com/docs/en/skills) — `planner` and
+- [Skills](https://code.claude.com/docs/en/skills) — `implementation-planner` and
   `implementer` preload the **same full catalog** via `skills:`, so both reason
   from an identical vocabulary and a plan cannot cite a rule the implementer
   has not read. Preloading injects each skill's *full body* at startup (~29k

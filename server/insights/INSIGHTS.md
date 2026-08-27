@@ -106,6 +106,8 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   is not a function` at `buildApp` time — the failure names repo-intel and points
   at boot, which reads like an app bug rather than a test-double gap.
 
+- **2026-08-27** — `arch:check`/`arch:ratchet` only cruise `src` (+ `../reviewer-core/src`), not `server/test/` — every existing `*.it.test.ts` lives in `server/test/` for exactly this reason. A test file placed inside `src/modules/<name>/` instead (e.g. because a Development Plan named that path literally) trips real, new violations the moment it needs a DB row type or a sibling module's port: `repository-owns-persistence` on `import * as schema from '../../db/schema.js'`, and `no-cross-module-imports` on importing another module's `service.ts`/`repository.ts` to build a fake. Fix is to move the file to `server/test/` (adjusting relative imports), not to bless the violation in the ratchet baseline. If the test only needs a row *type* (not the schema module itself), add it to `src/db/rows.ts` instead — that file is explicitly exempt from `repository-owns-persistence` and already exists so cross-cutting consumers can reference a row shape without importing `db/schema.ts`.
+
 ## Session Notes
 
 ## Open Questions

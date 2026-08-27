@@ -19,6 +19,7 @@ Reusable AI skills that provide specialized knowledge and workflows. Canonical l
 | [security](security/SKILL.md) | Full-stack | OWASP Top 10:2025, auth, injection, uploads, secrets |
 | [mermaid-diagram](mermaid-diagram/SKILL.md) | Shared | Mermaid diagrams in markdown (flowcharts, sequence, ERD, …) |
 | [engineering-insights](engineering-insights/SKILL.md) | Shared | Captures durable session learnings into the touched module's `insights/INSIGHTS.md` |
+| [workflow-retro](workflow-retro/SKILL.md) | Shared | Cost/latency post-mortem on a finished multi-agent pipeline run — tokens, cache reads, tool calls, parallelism, per subagent; appends a trend row to `docs/retros/ledger.md` |
 | [pr-self-review](pr-self-review/SKILL.md) | Shared | The pre-PR gate: routes the diff onto these skills, runs the gates, blocks the merge on a critical finding ([docs](pr-self-review/README.md)) |
 | [api-contract-breaking-change](api-contract-breaking-change/SKILL.md) | Product (DevDigest agent) | Route path/method, required params, request shape, status codes/enums — public API breaking changes |
 | [api-contract-response-schema](api-contract-response-schema/SKILL.md) | Product (DevDigest agent) | Response body shape — field removal/rename, type changes, nullability, pagination/error envelopes |
