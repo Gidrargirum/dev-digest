@@ -14,10 +14,16 @@ vi.mock("@/lib/hooks", () => ({
 vi.mock("@/lib/hooks/context", () => ({
   useContextDocs: () => ({
     data: [
-      { path: ".devdigest/specs/a.md", name: "a.md", source: "specs", size_bytes: 1024, tokens: 80, used_by_agents: 0 },
-      { path: ".devdigest/specs/b.md", name: "b.md", source: "specs", size_bytes: 2048, tokens: 220, used_by_agents: 1 },
+      { path: "specs/a.md", name: "a.md", source: "specs", size_bytes: 1024, tokens: 80, used_by_agents: 0 },
+      { path: "specs/b.md", name: "b.md", source: "specs", size_bytes: 2048, tokens: 220, used_by_agents: 1 },
     ] satisfies ContextDoc[],
     isLoading: false,
+  }),
+  useContextDocContent: (_repoId: unknown, path: string | null | undefined) => ({
+    data: path ? { path, content: `# ${path}\n\nBody of ${path}.` } : undefined,
+    isLoading: false,
+    isError: false,
+    error: null,
   }),
   useSkillContext: () => ({ data: [], isLoading: false }),
   useSetSkillContext: () => ({ mutate: setContextMutate, isPending: false, isSuccess: false }),
@@ -65,7 +71,33 @@ describe("ProjectContextSection", () => {
 
     fireEvent.click(screen.getByText("Save context"));
     expect(setContextMutate).toHaveBeenCalledWith(
-      { skillId: "sk1", repoId: "r1", paths: [".devdigest/specs/a.md", ".devdigest/specs/b.md"] },
+      { skillId: "sk1", repoId: "r1", paths: ["specs/a.md", "specs/b.md"] },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+  });
+
+  it("shows each document's token count and previews a document", () => {
+    renderWithIntl(<ProjectContextSection skill={SKILL} />);
+    expect(screen.getByText("80t")).toBeInTheDocument();
+    expect(screen.getByText("220t")).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByText("Preview")[0]!);
+    expect(screen.getByLabelText("Document preview")).toBeInTheDocument();
+    expect(screen.getByText("Body of specs/a.md.")).toBeInTheDocument();
+  });
+
+  it("reorders via the drag handle's arrow keys", () => {
+    renderWithIntl(<ProjectContextSection skill={SKILL} />);
+
+    const checkboxes = screen.getAllByRole("checkbox");
+    fireEvent.click(checkboxes[0]!);
+    fireEvent.click(checkboxes[1]!);
+
+    fireEvent.keyDown(screen.getByLabelText(/Reorder a\.md/), { key: "ArrowDown" });
+
+    fireEvent.click(screen.getByText("Save context"));
+    expect(setContextMutate).toHaveBeenLastCalledWith(
+      { skillId: "sk1", repoId: "r1", paths: ["specs/b.md", "specs/a.md"] },
       expect.objectContaining({ onSuccess: expect.any(Function) }),
     );
   });

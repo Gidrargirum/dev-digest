@@ -1,18 +1,39 @@
 /* ProjectContextSection — "Project context to use" (AC-10): attach/detach
-   repository .md documents to a skill, reorder them, and see the combined
-   token estimate — the same treatment as an agent's Context tab (AC-7),
-   not just the SERIALIZES AS block. A broken attachment stays attached with
-   a visible marker until detached (AC-21). */
+   repository .md documents to a skill, reorder them by drag-and-drop (order is
+   the ONLY thing a drag changes), see each document's token count, and preview
+   any document's rendered content in the right-hand panel — the same treatment
+   as an agent's Context tab (AC-7). A broken attachment stays attached with a
+   visible marker until detached (AC-21).
+
+   Kept in lock-step with
+   app/agents/[id]/_components/AgentEditor/_components/ContextTab/ContextTab.tsx
+   (parallel copies — the skill version has no "inherited from skills" list). */
 "use client";
 
 import React from "react";
 import { useTranslations } from "next-intl";
-import { Checkbox, TextInput, IconBtn, Button, Badge, Skeleton, Icon, SelectInput } from "@devdigest/ui";
+import {
+  Checkbox,
+  TextInput,
+  IconBtn,
+  Button,
+  Badge,
+  Skeleton,
+  Icon,
+  SelectInput,
+  Markdown,
+} from "@devdigest/ui";
 import type { Skill } from "@devdigest/shared";
 import { useRepos } from "@/lib/hooks";
-import { useContextDocs, useSkillContext, useSetSkillContext } from "@/lib/hooks/context";
+import {
+  useContextDocs,
+  useContextDocContent,
+  useSkillContext,
+  useSetSkillContext,
+} from "@/lib/hooks/context";
+import { ApiError } from "@/lib/api";
 import { useToast } from "@/lib/toast";
-import { filterDocs, reorder, sumTokens } from "./helpers";
+import { filterDocs, moveBefore, reorder, seedSequence, sumTokens } from "./helpers";
 import { SKELETON_ROWS } from "./constants";
 import { s } from "./styles";
 
@@ -34,49 +55,82 @@ export function ProjectContextSection({ skill }: { skill: Skill }) {
   const setContext = useSetSkillContext();
 
   const [search, setSearch] = React.useState("");
-  const [order, setOrder] = React.useState<string[]>([]);
-  const [brokenPaths, setBrokenPaths] = React.useState<Set<string>>(new Set());
+  const [sequence, setSequence] = React.useState<string[]>([]);
+  const [attached, setAttached] = React.useState<Set<string>>(new Set());
+  const [brokenExtra, setBrokenExtra] = React.useState<string[]>([]);
+  const [previewPath, setPreviewPath] = React.useState<string | null>(null);
+  const [dragPath, setDragPath] = React.useState<string | null>(null);
+  const [dragOverPath, setDragOverPath] = React.useState<string | null>(null);
+
+  const catalogDocs = React.useMemo(() => catalog ?? [], [catalog]);
 
   const seededFor = React.useRef<string | null>(null);
   React.useEffect(() => {
     const key = `${skill.id}:${repoId}`;
-    if (!attachments || !repoId || seededFor.current === key) return;
+    if (!attachments || !catalog || !repoId || seededFor.current === key) return;
     seededFor.current = key;
     const sorted = [...attachments].sort((a, b) => a.order - b.order);
-    setOrder(sorted.map((a) => a.path));
-    setBrokenPaths(new Set(sorted.filter((a) => a.broken).map((a) => a.path)));
-  }, [skill.id, repoId, attachments]);
+    const knownPaths = new Set(catalogDocs.map((d) => d.path));
+    setSequence(seedSequence(catalogDocs, sorted.map((a) => a.path)));
+    setAttached(new Set(sorted.map((a) => a.path)));
+    setBrokenExtra(sorted.filter((a) => a.broken && !knownPaths.has(a.path)).map((a) => a.path));
+    setPreviewPath(null);
+  }, [skill.id, repoId, attachments, catalog, catalogDocs]);
 
-  const catalogDocs = catalog ?? [];
-  const filtered = filterDocs(catalogDocs, search);
-  const tokenTotal = sumTokens(order, catalogDocs);
+  const orderedDocs = React.useMemo(() => {
+    const byPath = new Map(catalogDocs.map((d) => [d.path, d]));
+    return sequence.map((p) => byPath.get(p)).filter((d): d is NonNullable<typeof d> => !!d);
+  }, [sequence, catalogDocs]);
+
+  const filtered = filterDocs(orderedDocs, search);
+  const attachedOrdered = React.useMemo(
+    () => sequence.filter((p) => attached.has(p)),
+    [sequence, attached],
+  );
+  const tokenTotal = sumTokens(attachedOrdered, catalogDocs);
+
+  const preview = useContextDocContent(repoId || undefined, previewPath);
 
   const toggleAttach = (path: string, attach: boolean) => {
-    setOrder((prev) => (attach ? [...prev, path] : prev.filter((p) => p !== path)));
-    if (!attach) setBrokenPaths((prev) => new Set([...prev].filter((p) => p !== path)));
+    setAttached((prev) => {
+      const next = new Set(prev);
+      if (attach) next.add(path);
+      else next.delete(path);
+      return next;
+    });
   };
 
-  const move = (path: string, direction: -1 | 1) => {
-    setOrder((prev) => reorder(prev, prev.indexOf(path), direction));
+  const applyDrop = (target: string) => {
+    if (dragPath && dragPath !== target) {
+      setSequence((prev) => moveBefore(prev, dragPath, target));
+    }
+    setDragPath(null);
+    setDragOverPath(null);
+  };
+
+  const moveByKey = (path: string, direction: -1 | 1) => {
+    setSequence((prev) => reorder(prev, prev.indexOf(path), direction));
   };
 
   const save = () =>
     setContext.mutate(
-      { skillId: skill.id, repoId, paths: order },
+      { skillId: skill.id, repoId, paths: attachedOrdered },
       { onSuccess: () => toast.success(t("context.savedToast")) },
     );
 
   const loading = catalogLoading || attachmentsLoading || !repoId;
-  const brokenPathsNotInCatalog = order.filter(
-    (p) => brokenPaths.has(p) && !catalogDocs.some((d) => d.path === p),
-  );
+
+  const pathPrefix = (fullPath: string) => {
+    const slash = fullPath.lastIndexOf("/");
+    return slash === -1 ? "" : fullPath.slice(0, slash + 1);
+  };
 
   return (
     <div style={s.wrap}>
       <div style={s.header}>
         <h2 style={s.h2}>{t("context.title")}</h2>
         <span style={s.count}>
-          {t("context.attachedCount", { attached: order.length, total: catalogDocs.length })}
+          {t("context.attachedCount", { attached: attached.size, total: catalogDocs.length })}
         </span>
       </div>
       <p style={s.hint}>{t("context.hint")}</p>
@@ -91,7 +145,7 @@ export function ProjectContextSection({ skill }: { skill: Skill }) {
         </div>
       )}
 
-      {order.length > 0 && (
+      {attached.size > 0 && (
         <div style={s.tokenEstimate}>{t("context.tokenEstimate", { count: tokenTotal })}</div>
       )}
 
@@ -101,7 +155,7 @@ export function ProjectContextSection({ skill }: { skill: Skill }) {
             <Skeleton key={i} height={44} />
           ))}
         </div>
-      ) : catalogDocs.length === 0 && brokenPathsNotInCatalog.length === 0 ? (
+      ) : catalogDocs.length === 0 && brokenExtra.length === 0 ? (
         <div style={s.empty}>{t("context.emptyCatalog")}</div>
       ) : (
         <>
@@ -113,80 +167,140 @@ export function ProjectContextSection({ skill }: { skill: Skill }) {
               suffix={<Icon.Search size={13} style={{ color: "var(--text-muted)" }} />}
             />
           </div>
-          <div style={s.list}>
-            {filtered.map((doc) => {
-              const idx = order.indexOf(doc.path);
-              const attached = idx !== -1;
-              const broken = brokenPaths.has(doc.path);
-              return (
-                <div key={doc.path} style={{ ...s.row, ...(broken ? s.rowBroken : {}) }}>
-                  <div style={s.rowMain}>
-                    <Checkbox
-                      checked={attached}
-                      onChange={(v) => toggleAttach(doc.path, v)}
-                      label={
-                        <span className="mono" style={s.name}>
-                          {doc.path}
-                        </span>
-                      }
-                    />
-                    <Badge color="var(--text-secondary)">{doc.source}</Badge>
-                    {broken && (
-                      <Badge color="var(--crit)" bg="var(--crit-bg)">
-                        {t("context.broken")}
-                      </Badge>
-                    )}
-                  </div>
-                  {attached && (
-                    <div style={s.rowActions}>
-                      <span style={s.order}>{idx + 1}</span>
-                      <div style={s.reorderBtns}>
-                        <span style={idx === 0 ? s.reorderDisabled : undefined}>
-                          <IconBtn
-                            icon="ArrowUp"
-                            label={t("context.moveUp", { name: doc.name })}
-                            size={20}
-                            onClick={idx === 0 ? undefined : () => move(doc.path, -1)}
-                          />
-                        </span>
-                        <span style={idx === order.length - 1 ? s.reorderDisabled : undefined}>
-                          <IconBtn
-                            icon="ArrowDown"
-                            label={t("context.moveDown", { name: doc.name })}
-                            size={20}
-                            onClick={idx === order.length - 1 ? undefined : () => move(doc.path, 1)}
-                          />
-                        </span>
-                      </div>
-                      <Button kind="ghost" size="sm" onClick={() => toggleAttach(doc.path, false)}>
-                        {t("context.detach")}
+
+          <div style={{ ...s.split, ...(previewPath ? s.splitWithPanel : {}) }}>
+            <div style={s.list} role="list">
+              {filtered.map((doc) => {
+                const isAttached = attached.has(doc.path);
+                const isDragging = dragPath === doc.path;
+                const isDragOver = dragOverPath === doc.path && dragPath !== doc.path;
+                return (
+                  <div
+                    key={doc.path}
+                    role="listitem"
+                    style={{
+                      ...s.row,
+                      ...(isDragging ? s.rowDragging : {}),
+                      ...(isDragOver ? s.rowDragOver : {}),
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      setDragOverPath(doc.path);
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      applyDrop(doc.path);
+                    }}
+                  >
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={t("context.dragHandle", { name: doc.name })}
+                      draggable
+                      style={s.handle}
+                      onDragStart={() => setDragPath(doc.path)}
+                      onDragEnd={() => {
+                        setDragPath(null);
+                        setDragOverPath(null);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          moveByKey(doc.path, -1);
+                        } else if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          moveByKey(doc.path, 1);
+                        }
+                      }}
+                    >
+                      <Icon.Menu size={13} />
+                    </div>
+
+                    <div style={s.rowMain}>
+                      <Checkbox
+                        checked={isAttached}
+                        onChange={(v) => toggleAttach(doc.path, v)}
+                        label={
+                          <span style={s.rowMain}>
+                            <span className="mono" style={s.name}>
+                              {doc.name}
+                            </span>
+                            {pathPrefix(doc.path) && (
+                              <span className="mono" style={s.pathPrefix}>
+                                {pathPrefix(doc.path)}
+                              </span>
+                            )}
+                          </span>
+                        }
+                      />
+                    </div>
+
+                    <div style={s.meta}>
+                      {isAttached && <span style={s.order}>{attachedOrdered.indexOf(doc.path) + 1}</span>}
+                      <Badge color="var(--text-secondary)">{doc.source}</Badge>
+                      <span style={s.tokens}>{t("context.tokensShort", { count: doc.tokens })}</span>
+                      <Button
+                        kind={previewPath === doc.path ? "secondary" : "ghost"}
+                        size="sm"
+                        icon="Eye"
+                        onClick={() => setPreviewPath((p) => (p === doc.path ? null : doc.path))}
+                      >
+                        {t("context.preview")}
                       </Button>
                     </div>
-                  )}
-                </div>
-              );
-            })}
-            {brokenPathsNotInCatalog.map((path) => {
-              const idx = order.indexOf(path);
-              return (
-                <div key={path} style={{ ...s.row, ...s.rowBroken }}>
-                  <div style={s.rowMain}>
-                    <span className="mono" style={s.name}>
-                      {path}
-                    </span>
-                    <Badge color="var(--crit)" bg="var(--crit-bg)">
-                      {t("context.broken")}
-                    </Badge>
                   </div>
-                  <div style={s.rowActions}>
-                    <span style={s.order}>{idx + 1}</span>
-                    <Button kind="ghost" size="sm" onClick={() => toggleAttach(path, false)}>
-                      {t("context.detach")}
-                    </Button>
-                  </div>
+                );
+              })}
+
+              {/* Attached paths missing from the live catalog entirely — still
+                  shown so the user can detach them (AC-21). */}
+              {brokenExtra.map((path) => (
+                <div key={path} style={{ ...s.row, ...s.rowBroken }} role="listitem">
+                  <span className="mono" style={s.name}>
+                    {path}
+                  </span>
+                  <Badge color="var(--crit)" bg="var(--crit-bg)">
+                    {t("context.broken")}
+                  </Badge>
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    onClick={() => setBrokenExtra((prev) => prev.filter((p) => p !== path))}
+                  >
+                    {t("context.detach")}
+                  </Button>
                 </div>
-              );
-            })}
+              ))}
+            </div>
+
+            {previewPath && (
+              <aside style={s.panel} aria-label={t("context.previewPanel")}>
+                <div style={s.panelHead}>
+                  <span className="mono" style={s.panelPath}>
+                    {previewPath}
+                  </span>
+                  <IconBtn
+                    icon="XCircle"
+                    label={t("context.previewClose")}
+                    size={24}
+                    onClick={() => setPreviewPath(null)}
+                  />
+                </div>
+                {preview.isLoading ? (
+                  <Skeleton height={200} />
+                ) : preview.isError ? (
+                  <p style={s.panelState}>
+                    {preview.error instanceof ApiError
+                      ? preview.error.message
+                      : t("context.previewError")}
+                  </p>
+                ) : (
+                  <div style={s.panelBody}>
+                    <Markdown>{preview.data?.content}</Markdown>
+                  </div>
+                )}
+              </aside>
+            )}
           </div>
         </>
       )}

@@ -64,7 +64,13 @@
     "save": "Save context",
     "saving": "Saving…",
     "saved": "Context saved",
-    "savedToast": "Context saved"
+    "savedToast": "Context saved",
+    "tokensShort": "{count}t",
+    "preview": "Preview",
+    "previewClose": "Close preview",
+    "previewPanel": "Document preview",
+    "previewError": "Couldn’t load this document",
+    "dragHandle": "Reorder {name} — drag, or use arrow keys"
   },
   "stats": {
     "usedBy": "Used by",
