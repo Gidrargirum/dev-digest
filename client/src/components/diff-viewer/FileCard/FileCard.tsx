@@ -16,7 +16,7 @@ import {
   type DiffCommentApi,
 } from "../comments";
 import { partitionMarks, marksForLine, as, type DiffAnnotationApi } from "../annotations";
-import { s, chevronFor } from "../styles";
+import { s, chevronFor, targetFileHighlight } from "../styles";
 import { CodeLine } from "../CodeLine";
 import { OutdatedComments } from "../OutdatedComments";
 import { FindingMarks } from "../FindingMarks";
@@ -36,16 +36,56 @@ export function FileCard({
   file,
   commenting,
   annotations,
+  isTarget = false,
+  targetLine = null,
 }: {
   file: PrFile;
   commenting?: DiffCommentApi;
   annotations?: DiffAnnotationApi;
+  /** This card is the `?file=` deep-link target (AC-25/28): expand if
+   *  collapsed, scroll into view, and flash the target line. */
+  isTarget?: boolean;
+  targetLine?: number | null;
 }) {
   const t = useTranslations("shell");
   const [open, setOpen] = React.useState(
     (file.additions ?? 0) + (file.deletions ?? 0) <= AUTO_EXPAND_MAX_LINES
   );
   const lines = React.useMemo(() => parsePatch(file.patch), [file.patch]);
+  const hasTargetLine =
+    targetLine != null &&
+    lines.some(
+      (line) =>
+        line.newNo === targetLine ||
+        (line.newNo == null && line.oldNo === targetLine),
+    );
+  // A URL target expands the card without copying derived prop state into the
+  // user's collapse preference. Removing the target restores that preference.
+  const expanded = open || isTarget;
+
+  // Deep-link target handling. Kept pending until this card is mounted (it
+  // always is, once rendered) — expand, scroll, and flash the line for a few
+  // seconds; `file`/`line` stay in the URL after the flash fades (AC-26).
+  const cardRef = React.useRef<HTMLDivElement>(null);
+  const [flash, setFlash] = React.useState(false);
+  React.useEffect(() => {
+    if (!isTarget) return;
+    setFlash(true);
+    // A rendered target line owns scrolling through CodeLine. Scrolling the
+    // whole card afterwards would override it in long files; the card fallback
+    // is only for file-only links or line numbers absent from the patch.
+    const scrollId = !hasTargetLine
+      ? window.setTimeout(() => {
+          cardRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }, 60)
+      : undefined;
+    const fadeId = window.setTimeout(() => setFlash(false), 2500);
+    return () => {
+      if (scrollId !== undefined) window.clearTimeout(scrollId);
+      window.clearTimeout(fadeId);
+    };
+  }, [hasTargetLine, isTarget, targetLine]);
+  const highlightLine = isTarget && flash && hasTargetLine ? targetLine : null;
 
   // Group this file's comments into threads, then split into ones we can anchor
   // to a rendered line vs. "outdated" (GitHub dropped the line / it's not here).
@@ -73,11 +113,16 @@ export function FileCard({
     : 0;
 
   const isLarge = !!annotations && isLargeFile(file, annotations.largeFileLines);
+  const cardStyle = {
+    ...s.fileCard,
+    ...(isLarge ? s.fileCardLarge : {}),
+    ...(isTarget && flash && !hasTargetLine ? targetFileHighlight : {}),
+  };
 
   return (
-    <div style={isLarge ? { ...s.fileCard, ...s.fileCardLarge } : s.fileCard}>
+    <div ref={cardRef} style={cardStyle}>
       <div onClick={() => setOpen((o) => !o)} style={s.fileHeader}>
-        <Icon.ChevronRight size={13} style={chevronFor(open)} />
+        <Icon.ChevronRight size={13} style={chevronFor(expanded)} />
         <Icon.FileText size={14} style={s.fileIcon} />
         <span className="mono" style={s.filePath}>
           {file.path}
@@ -101,7 +146,7 @@ export function FileCard({
           </span>
         )}
       </div>
-      {open && (
+      {expanded && (
         <div style={s.fileBody}>
           {lines.length === 0 ? (
             <div style={s.noDiff}>{t("diffViewer.noDiffText")}</div>
@@ -115,6 +160,7 @@ export function FileCard({
                 commenting={commenting}
                 marks={marksForLine(ln, anchoredMarks)}
                 annotations={annotations}
+                highlightLine={highlightLine}
               />
             ))
           )}

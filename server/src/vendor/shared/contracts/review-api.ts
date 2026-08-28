@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { Finding, Verdict } from './findings.js';
-import { Intent, SmartDiff } from './brief.js';
+import { Brief, Intent, SmartDiff } from './brief.js';
 
 /**
  * A2 — Review-Core API surface contracts. These extend the core
@@ -69,6 +69,28 @@ export const PrIntentResponse = z.object({
   intent: PrIntentRecord.nullable(),
 });
 export type PrIntentResponse = z.infer<typeof PrIntentResponse>;
+
+/**
+ * PR Brief persisted for a PR: the model `Brief` plus the `head_sha` it was
+ * generated under and the run that produced it. `run_id` is nullable — the FK
+ * is `ON DELETE SET NULL` and a forced regeneration is not tied to any run.
+ */
+export const PrBriefRecord = Brief.extend({
+  pr_id: z.string(),
+  head_sha: z.string(),
+  run_id: z.string().nullable(),
+  generated_at: z.string(),
+});
+export type PrBriefRecord = z.infer<typeof PrBriefRecord>;
+
+/**
+ * Response of `POST /pulls/:id/brief`; `null` when no Brief is cached for the
+ * PR's current `head_sha` (AC-11) — mirrors `PrIntentResponse`'s convention.
+ */
+export const PrBriefResponse = z.object({
+  brief: PrBriefRecord.nullable(),
+});
+export type PrBriefResponse = z.infer<typeof PrBriefResponse>;
 
 /** Smart-diff response for a PR (the SmartDiff). */
 export const SmartDiffResponse = SmartDiff;

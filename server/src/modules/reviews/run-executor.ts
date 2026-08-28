@@ -131,6 +131,11 @@ export class ReviewRunExecutor {
     const intentStep = await this.buildIntentStep(workspaceId, pull, repo, diff, jobs, runLog);
     // `jobs.length === 0` returned above, so `jobs[0]` is defined.
     const firstRunId = jobs[0]!.runId;
+    // Brief generation belongs to the first run that actually reaches the
+    // successful completion path. If the first queued agent fails earlier,
+    // the next successful run gets the attempt; once a successful run has
+    // completed, the lock+cache keeps every later run LLM-free (AC-1/AC-7).
+    let briefCompletionClaimed = false;
 
     for (const { agent, runId } of jobs) {
       const agentStart = Date.now();
@@ -149,7 +154,9 @@ export class ReviewRunExecutor {
           runLog,
           intentStep,
           runId === firstRunId,
+          !briefCompletionClaimed,
         );
+        briefCompletionClaimed = true;
         logger?.info(
           {
             runId,
@@ -183,6 +190,7 @@ export class ReviewRunExecutor {
     parentLog: RunLogger,
     intentStep: IntentStepResult,
     isFirstRun: boolean,
+    shouldGenerateBrief: boolean,
   ): Promise<RunOutcome> {
     const start = Date.now();
     // Narrow the fanned-out pre-work logger to THIS run; the shared diff/intent
@@ -276,14 +284,14 @@ export class ReviewRunExecutor {
       // charged to the FIRST queued run only, and only when it actually ran an
       // LLM call this round (cache hit / failure ⇒ zero, everywhere).
       const intentUsage = isFirstRun ? intentStep.usage : undefined;
-      const attributedTokensIn = tokensIn + (intentUsage?.tokensIn ?? 0);
-      const attributedTokensOut = tokensOut + (intentUsage?.tokensOut ?? 0);
+      let attributedTokensIn = tokensIn + (intentUsage?.tokensIn ?? 0);
+      let attributedTokensOut = tokensOut + (intentUsage?.tokensOut ?? 0);
       // An unknown intent cost (`estimateCost` → null, surfaced as
       // `cost:unknown` in the tool_calls entry below) must NEVER destroy the
       // run's own, known `costUsd` — it is simply not added (specs/pr-intent-
       // layer.md "Cost attribution"). Sum only when both sides are known; fall
       // back to whichever single side is known; `null` only when both are.
-      const attributedCostUsd =
+      let attributedCostUsd =
         intentUsage?.costUsd == null
           ? costUsd
           : costUsd == null
@@ -322,26 +330,53 @@ export class ReviewRunExecutor {
       // reviewed / needs-review (head moved) / stale apart.
       await this.repo.markReviewed(pull.id, pull.headSha);
 
-      const durationMs = Date.now() - start;
+      const reviewDurationMs = Date.now() - start;
 
       // Deterministic blocker count (severity ≥ the agent's gate) — the signal
       // the timeline colors on, NOT the model's self-reported verdict.
       const blockers = countBlockers(keptFindings, agent.ciFailOn);
 
-      // ---- Observability: agent_runs + ONE run_traces document --------------
-      await this.repo.completeAgentRun(runId, {
-        status: 'done',
-        durationMs,
-        tokensIn: attributedTokensIn,
-        tokensOut: attributedTokensOut,
-        costUsd: attributedCostUsd,
-        findingsCount: findingRows.length,
-        grounding,
-        score: outcome.review.score,
-        blockers,
-        error: null,
-      });
+      // ---- PR Brief generation (specs/2026-08-28-pr-brief.md) --------------
+      // Side effect of the first queued run that reaches this successful
+      // completion path (AC-1), so a failed first agent cannot suppress the
+      // Brief and its tokens/cost still land on exactly one run (AC-8). Its OWN
+      // try/catch — NOT `runLog.step()`, which emits an 'error' event and
+      // re-throws (insights/INSIGHTS.md 2026-08-19): a Brief failure must never
+      // block, fail, or alter the review run (AC-6).
+      if (shouldGenerateBrief) {
+        try {
+          const briefResult = await this.container.brief.generateForRun({
+            workspaceId,
+            prId: pull.id,
+            headSha: pull.headSha,
+            runId,
+          });
+          const bu = briefResult.usage;
+          if (bu) {
+            attributedTokensIn += bu.tokensIn;
+            attributedTokensOut += bu.tokensOut;
+            // Same rule as intent above: an unknown Brief cost never destroys
+            // the run's own known cost — add only when both sides are known.
+            attributedCostUsd =
+              bu.costUsd == null
+                ? attributedCostUsd
+                : attributedCostUsd == null
+                  ? bu.costUsd
+                  : attributedCostUsd + bu.costUsd;
+            runLog.info(`PR Brief generated (${bu.tokensIn}→${bu.tokensOut} tokens)`);
+          }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          runLog.info(`Brief generation skipped: ${message}`);
+        }
+      }
 
+      const durationMs = Date.now() - start;
+
+      // ---- Observability: agent_runs + ONE run_traces document --------------
+      // Persist the trace before exposing status=done. Pollers use that status
+      // as the completion boundary and may immediately request the trace.
+      runLog.info('Run complete; persisting trace');
       const trace: RunTrace = {
         config: {
           agent: agent.name,
@@ -366,7 +401,7 @@ export class ReviewRunExecutor {
             tool: 'review_file',
             args: c.label,
             meta: outcome.mode,
-            ms: Math.round(durationMs / Math.max(outcome.chunks.length, 1)),
+            ms: Math.round(reviewDurationMs / Math.max(outcome.chunks.length, 1)),
           })),
         ],
         raw_output: outcome.raw,
@@ -376,8 +411,19 @@ export class ReviewRunExecutor {
         // diff load + intent), not just events recorded inside this method.
         log: runLog.logFor(runId),
       };
-      runLog.info('Run complete; trace persisted');
       await this.repo.saveRunTrace(runId, trace);
+      await this.repo.completeAgentRun(runId, {
+        status: 'done',
+        durationMs,
+        tokensIn: attributedTokensIn,
+        tokensOut: attributedTokensOut,
+        costUsd: attributedCostUsd,
+        findingsCount: findingRows.length,
+        grounding,
+        score: outcome.review.score,
+        blockers,
+        error: null,
+      });
       this.container.runBus.complete(runId);
 
       return { review, findings: findingRows, grounding, raw: outcome.review };

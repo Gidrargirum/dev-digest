@@ -5,6 +5,7 @@ import {
   Intent,
   BlastRadius,
   Risks,
+  Brief,
   PrHistory,
   SmartDiff,
   Conformance,
@@ -115,6 +116,17 @@ describe('AI contracts parse fixtures', () => {
         risks: [{ kind: 'security', title: 't', explanation: 'e', severity: 'high', file_refs: [] }],
       }),
     ).not.toThrow();
+    expect(() =>
+      Brief.parse({
+        what: 'w',
+        why: 'y',
+        risk_level: 'medium',
+        risks: [
+          { kind: 'made_up', title: 't', explanation: 'e', severity: 'high', file_refs: [] },
+        ],
+        review_focus: [],
+      }),
+    ).toThrow();
     expect(() =>
       PrHistory.parse({
         history: [

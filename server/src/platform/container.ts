@@ -35,7 +35,10 @@ import { IntentRepository } from '../modules/intent/repository.js';
 import { BlastService } from '../modules/blast/service.js';
 import type { BlastPort } from '../modules/blast/types.js';
 import { BlastRepository } from '../modules/blast/repository.js';
-import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
+import { BriefService } from '../modules/brief/service.js';
+import type { BriefPort } from '../modules/brief/types.js';
+import { BriefRepository } from '../modules/brief/repository.js';
+import { getFeatureModelOverride, resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
 import type { ContextDocsReader, ContextDocsWriter } from '../ports/index.js';
@@ -67,6 +70,8 @@ export interface ContainerOverrides {
   /** Intent facade — tests inject a mock IntentPort implementation. */
   intent?: IntentPort;
   blast?: BlastPort;
+  /** PR Brief facade — tests inject a mock BriefPort implementation. */
+  brief?: BriefPort;
   /** Project Context Folder reader+writer — tests inject a mock implementation. */
   contextDocs?: ContextDocsReader & ContextDocsWriter;
   /** Project Context Folder service — tests inject a mock/stub ContextService. */
@@ -99,6 +104,7 @@ export class Container {
   private _priceBook?: PriceBook;
   private _intent?: IntentPort;
   private _blast?: BlastPort;
+  private _brief?: BriefPort;
   private _contextDocs?: ContextDocsReader & ContextDocsWriter;
   private _projectContext?: ContextService;
 
@@ -187,6 +193,27 @@ export class Container {
     if (this.overrides.blast) return this.overrides.blast;
     this._blast ??= new BlastService(new BlastRepository(this.db), this.repoIntel);
     return this._blast;
+  }
+
+  /**
+   * PR Brief facade (`modules/brief/README.md`) — generates + caches a PR's
+   * Brief on run completion, serves it on `POST /pulls/:id/brief`. Takes ports
+   * (`llm`, the resolved `risk_brief` model, and `this.blast`, which
+   * structurally satisfies `BriefBlastSource`), never `this`. Tests inject a
+   * mock via `ContainerOverrides.brief`.
+   */
+  get brief(): BriefPort {
+    if (this.overrides.brief) return this.overrides.brief;
+    this._brief ??= new BriefService(
+      {
+        llm: (provider) => this.llm(provider),
+        github: () => this.github(),
+        featureModel: (workspaceId) => resolveFeatureModel(this.db, workspaceId, 'risk_brief'),
+        blast: this.blast,
+      },
+      new BriefRepository(this.db),
+    );
+    return this._brief;
   }
 
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */

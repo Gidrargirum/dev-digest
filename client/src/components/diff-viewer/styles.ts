@@ -79,6 +79,22 @@ export const s = {
   } satisfies CSSProperties,
 } as const;
 
+/** Deep-link target line flash (AC-25) — a warm tint + left accent bar that
+ *  fades out after a couple of seconds (the fade is driven by unmounting the
+ *  style in FileCard, not a CSS transition). */
+export const targetRowHighlight: CSSProperties = {
+  background: "var(--warn-bg)",
+  boxShadow: "inset 3px 0 0 var(--warn)",
+  transition: "background .4s ease",
+};
+
+/** File-only deep-link flash (AC-25): used when no line was supplied. */
+export const targetFileHighlight: CSSProperties = {
+  borderColor: "var(--warn)",
+  boxShadow: "0 0 0 2px var(--warn-bg)",
+  transition: "border-color .4s ease, box-shadow .4s ease",
+};
+
 /** Chevron rotates 90deg when the file card is open. */
 export function chevronFor(open: boolean): CSSProperties {
   return {
