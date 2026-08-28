@@ -84,11 +84,9 @@ export function renderIntentForPrompt(record: {
   intent: string;
   in_scope: string[];
   out_of_scope: string[];
-  risk_areas: string[];
 }): string {
   const lines = [record.intent.trim()];
   if (record.in_scope.length > 0) lines.push(`In scope: ${record.in_scope.join('; ')}`);
   if (record.out_of_scope.length > 0) lines.push(`Out of scope: ${record.out_of_scope.join('; ')}`);
-  if (record.risk_areas.length > 0) lines.push(`Risk areas: ${record.risk_areas.join('; ')}`);
   return lines.join('\n');
 }

@@ -1,7 +1,7 @@
 # modules/intent — PR Intent
 
 Derives a PR's **intent** — one sentence of motivation, `in_scope[]`,
-`out_of_scope[]`, `risk_areas[]`, and a code-computed `confidence` — before
+`out_of_scope[]` and a code-computed `confidence` — before
 the main review, from sources already in the system. Feeds the review prompt
 as CONTEXT ONLY. Normative spec: `specs/pr-intent-layer.md`.
 
@@ -12,7 +12,7 @@ flowchart TD
   A[ReviewRunExecutor.executeRuns, after loadDiff] --> B{repo.findIntent pr_id}
   B -- head_sha matches --> C[cache hit — no LLM call]
   B -- miss / mismatch --> D[gather sources: title, branch, files, body, linked issues]
-  D --> E[LLM: PrIntent schema — intent/in_scope/out_of_scope/risk_areas]
+  D --> E[LLM: PrIntent schema — intent/in_scope/out_of_scope]
   E --> F[confidenceFromSources — code, not the model]
   F --> G[repo.upsertIntent — pr_id PK, overwrites on new head_sha]
   C --> H[render text for the review prompt's intent slot]

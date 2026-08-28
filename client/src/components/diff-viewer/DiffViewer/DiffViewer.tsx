@@ -16,12 +16,18 @@ export function DiffViewer({
   files,
   commenting,
   annotations,
+  targetFile,
+  targetLine,
 }: {
   files: PrFile[];
   commenting?: DiffCommentApi;
   /** Smart Diff finding marks + large-file badge. Optional, exactly like
    *  `commenting` — `undefined` leaves normal-mode rendering unchanged. */
   annotations?: DiffAnnotationApi;
+  /** Deep-link target (AC-24/25). Only ever compared against `PrFile.path` —
+   *  an unmatched value leaves every card rendering normally (AC-27). */
+  targetFile?: string | null;
+  targetLine?: number | null;
 }) {
   const t = useTranslations("shell");
   if (!files || files.length === 0) {
@@ -30,7 +36,14 @@ export function DiffViewer({
   return (
     <div style={s.list}>
       {files.map((f, i) => (
-        <FileCard key={i} file={f} commenting={commenting} annotations={annotations} />
+        <FileCard
+          key={i}
+          file={f}
+          commenting={commenting}
+          annotations={annotations}
+          isTarget={!!targetFile && f.path === targetFile}
+          targetLine={targetLine ?? null}
+        />
       ))}
     </div>
   );

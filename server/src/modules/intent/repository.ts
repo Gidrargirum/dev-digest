@@ -32,7 +32,6 @@ export function rowToIntentRecord(row: PrIntentRow): PrIntentRecord | undefined 
     intent: row.intent,
     in_scope: row.inScope,
     out_of_scope: row.outOfScope,
-    risk_areas: row.riskAreas,
     confidence: IntentConfidence.catch('low').parse(row.confidence),
     sources: row.sources,
     head_sha: row.headSha,
@@ -46,7 +45,6 @@ export interface UpsertIntentInput {
   intent: string;
   inScope: string[];
   outOfScope: string[];
-  riskAreas: string[];
   sources: string[];
   confidence: string;
   /** Cache key (decision #2 — `(pr_id, head_sha)`, PK is `pr_id` alone). */
@@ -93,7 +91,6 @@ export class IntentRepository {
         intent: input.intent,
         inScope: input.inScope,
         outOfScope: input.outOfScope,
-        riskAreas: input.riskAreas,
         sources: input.sources,
         confidence: input.confidence,
         headSha: input.headSha,
@@ -105,7 +102,6 @@ export class IntentRepository {
           intent: input.intent,
           inScope: input.inScope,
           outOfScope: input.outOfScope,
-          riskAreas: input.riskAreas,
           sources: input.sources,
           confidence: input.confidence,
           headSha: input.headSha,

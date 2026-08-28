@@ -38,7 +38,6 @@ const INTENT_FIXTURE = {
   intent: 'Adds rate limiting to the public API.',
   in_scope: ['rate limiting middleware'],
   out_of_scope: ['auth changes'],
-  risk_areas: ['public API surface'],
 };
 
 let repoSeq = 0;

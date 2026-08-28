@@ -96,6 +96,15 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   actually survived. Wrap the optional work in your own try/catch and report the
   failure with `runLog.info(...)` — the pattern `buildCallersDigest` /
   `buildRepoMapDigest` / the intent step in `reviews/run-executor.ts` already use.
+- **2026-08-28** — A body-less Fastify `POST` reaches the
+  `fastify-type-provider-zod` body validator as `null`, so a route that supports
+  both no payload and an object payload (for example `modules/brief/routes.ts`)
+  must declare its body schema with `.nullish()`: `.optional()` alone rejects the
+  no-payload form with the app's validation `422`.
+- **2026-08-28** — `agent_runs.status = 'done'` is a completion boundary for
+  pollers: once they observe it, they immediately request the run trace. Persist
+  `run_traces` before publishing `done` in `reviews/run-executor.ts`; the inverse
+  order creates a real race where a completed run temporarily has no trace.
 
 ## Recurring Errors & Fixes
 

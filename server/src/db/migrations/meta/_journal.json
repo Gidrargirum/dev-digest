@@ -134,6 +134,13 @@
       "when": 1787829395369,
       "tag": "0018_rapid_moon_knight",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1787904495672,
+      "tag": "0019_brief_justice",
+      "breakpoints": true
     }
   ]
 }
