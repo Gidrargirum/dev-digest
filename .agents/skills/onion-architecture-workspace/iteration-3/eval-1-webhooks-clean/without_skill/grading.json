@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Verdict: 'Layering is sound ... None of the server's dependency-cruiser rules is broken'",
+      "passed": true,
+      "evidence": "Verdict: 'Layering is sound ... None of the server's dependency-cruiser rules is broken'"
+    },
+    {
+      "text": "getDelivery pass-through not flagged",
+      "passed": true,
+      "evidence": "getDelivery pass-through not flagged"
+    },
+    {
+      "text": "platform/errors explicitly cleared: 'explicitly usable from any layer; no rule forbids it'",
+      "passed": true,
+      "evidence": "platform/errors explicitly cleared: 'explicitly usable from any layer; no rule forbids it'"
+    },
+    {
+      "text": "secret:string + port injection endorsed; concrete WebhooksRepository import explicitly 'not a rule violation'",
+      "passed": true,
+      "evidence": "secret:string + port injection endorsed; concrete WebhooksRepository import explicitly 'not a rule violation'"
+    },
+    {
+      "text": "Only a transitive helpers.ts concern (hedged) + two non-layering nits (AppError ctor arg, getter vs method)",
+      "passed": true,
+      "evidence": "Only a transitive helpers.ts concern (hedged) + two non-layering nits (AppError ctor arg, getter vs method)"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

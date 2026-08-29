@@ -11,16 +11,22 @@
 import { IS_BASELINE, WORKFLOW_ALLOWED_TOOLS } from "./config.js";
 import { runClaude, type RunOptions } from "./runtime/run-claude.js";
 import { runContent } from "./runtime/dispatch.js";
-import { skillContent, agentContent, agentTools } from "./artifacts/load.js";
+import { skillContent, agentContent, agentTools, skillTools } from "./artifacts/load.js";
 
 /**
  * Run a prompt with a skill's content injected (the 'candidate' condition). Under
  * EVAL_CONFIG=baseline the artifact is NOT injected — that is the benchmark's without-skill
  * baseline, i.e. the raw model, used to measure the skill's lift.
+ *
+ * Tools: a case may pass `allowedTools` (from its `tools:` field) to opt a procedural skill into
+ * a real tool-using run; otherwise they come from the skill's own `allowed-tools:` frontmatter,
+ * and `[]` (the default for a skill that declares none) keeps the historical content-only path.
+ * Both configs get the SAME tools so the measured lift stays fair (agentTask does likewise).
  */
 export function skillTask(prompt: string, skillName: string, opts: RunOptions = {}) {
   const systemPrompt = IS_BASELINE ? undefined : skillContent(skillName);
-  return runContent(prompt, { ...opts, systemPrompt });
+  const allowedTools = opts.allowedTools ?? skillTools(skillName);
+  return runContent(prompt, { ...opts, allowedTools, systemPrompt });
 }
 
 /**
@@ -35,8 +41,8 @@ export function skillTask(prompt: string, skillName: string, opts: RunOptions = 
  */
 export function agentTask(prompt: string, agentName: string, opts: RunOptions = {}) {
   const systemPrompt = IS_BASELINE ? undefined : agentContent(agentName);
-  const allowedTools = agentTools(agentName);
-  return runClaude(prompt, { allowedTools, ...opts, systemPrompt });
+  const allowedTools = opts.allowedTools ?? agentTools(agentName);
+  return runClaude(prompt, { ...opts, allowedTools, systemPrompt });
 }
 
 /**

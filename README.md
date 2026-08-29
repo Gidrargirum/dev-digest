@@ -150,10 +150,16 @@ path filter — full strategy in **[`TESTING.md`](TESTING.md)**.
 | server integration (real Postgres) | `server-integration.yml` | yes |
 | reviewer-core (engine) | `reviewer-core.yml` | no |
 | web e2e (agent-browser, real stack) | `e2e-web.yml` | yes |
+| harness evals (PR-selected models) | `evals.yml` | LiteLLM only |
 
 Server tests split by filename: `*.it.test.ts` are DB-backed (testcontainers
 Postgres); everything else is hermetic. The browser e2e flows live in
 [`e2e/`](e2e/README.md) and run deterministically (no LLM).
+
+Harness changes use the PR-aware [eval workflow](.github/workflows/evals.yml): matching skill or
+agent evals run when present, and agent or `AGENTS.md`/`CLAUDE.md` changes also run the general
+workflow. OpenRouter setup and explicit skip behavior are documented in
+[evals/README.md](evals/README.md#pull-request-ci).
 
 ## Troubleshooting
 

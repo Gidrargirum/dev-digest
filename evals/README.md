@@ -5,8 +5,8 @@ Evals for the DevDigest Claude Code harness — **skills** (`.claude/skills/*`),
 **vitest + the Claude Agent SDK**, in the same toolchain as the rest of the repo (`pnpm`).
 
 Runs on the Claude Code **subscription** by default — the API key is stripped from spawned
-processes, so calls use the login / credential helper, never per-token API billing. No external
-services, no third-party judge.
+processes, so calls use the login / credential helper. Pull-request CI uses OpenRouter for every
+model call, with the bundled LiteLLM bridge translating tool-using Agent SDK sessions.
 
 The **same tests** can also run on **OpenRouter** (DeepSeek and other cheap models) by setting
 `EVAL_BACKEND=openrouter` — no code changes, just env vars. See
@@ -52,27 +52,32 @@ the artifact → measured lift). All three read the same persisted `results/reco
   skills/agents). The *systemic* tier: does a skill actually **activate**, does a subagent actually
   get **dispatched**, does `CLAUDE.md` change behavior? A content-only eval can't see this.
 
-## Two scorers (both subscription-only)
+## Two scorers
 
 - `patternMatch(output, expected)` — deterministic substring coverage, no model. Use it as a
   cheap first tier: don't pay the judge for what a substring settles. When a case has a `grounding`
   gate it runs first and must equal `1.0`; the judge is skipped if it fails (cheap-tier economy).
-- `llmJudge(output, practices)` — one structured `query()` → strict JSON, binary PASS/FAIL per
+- `llmJudge(output, practices)` — one model turn → strict JSON, binary PASS/FAIL per
   practice, PASS only with a verbatim evidence quote (the LLM Message Pattern). The judge defaults
   to a **stronger family** (`EVAL_JUDGE_MODEL=claude-sonnet-5`) than the task (`claude-haiku-4-5`)
-  to soften single-model self-preference. On a shared subscription families still overlap — the
-  real mitigations are *blind + binary + verbatim evidence*.
+  to soften single-model self-preference locally. OpenRouter CI defaults the judge to Gemini 2.5
+  Flash. The structural mitigations are *blind + binary + verbatim evidence*.
 
 ## Runners: Claude Code (default) vs OpenRouter
 
 The same eval tests run against two backends, chosen by `EVAL_BACKEND` — you never edit a test to
-switch. The model name is a **separate** knob (`EVAL_MODEL` / `EVAL_JUDGE_MODEL`), and its format
-differs per backend.
+switch. The model name is a **separate** knob (`EVAL_CONTENT_MODEL` / `EVAL_TOOL_MODEL` /
+`EVAL_JUDGE_MODEL`), and its format differs per backend.
 
-| `EVAL_BACKEND` | Runtime | Auth | Model name format |
+| Variable | Subscription default | OpenRouter/CI default | Purpose |
 |---|---|---|---|
-| `subscription` *(default)* | Claude Agent SDK on the Claude Code login | none (API key stripped) | Anthropic ID — `claude-haiku-4-5` |
-| `openrouter` | see split below | `OPENROUTER_API_KEY` | OpenRouter slug — `deepseek/deepseek-chat`, `anthropic/claude-haiku-4.5`, `google/gemini-...` |
+| `EVAL_BACKEND` | `subscription` | `openrouter` | Selects authentication and transport |
+| `EVAL_CONTENT_MODEL` | `claude-haiku-4-5` | `deepseek/deepseek-v4-flash-0731` | Content-only skills |
+| `EVAL_TOOL_MODEL` | `claude-haiku-4-5` | `google/gemini-2.5-flash` | Tool skills, agents, workflow |
+| `EVAL_JUDGE_MODEL` | `claude-sonnet-5` | `google/gemini-2.5-flash` | Quality judge |
+| `EVAL_MODEL` | unset | unset | Backwards-compatible fallback for all three model variables |
+| `OPENROUTER_API_KEY` | unused/stripped | required secret | Authenticates OpenRouter; never exposed to fork PRs |
+| `OPENROUTER_BASE_URL` | unused | `http://localhost:4000` in CI | Routes calls through the LiteLLM bridge |
 
 **Why the backend splits by tier.** OpenRouter's native "Anthropic Skin" only serves *Anthropic*
 models, and only the Claude Agent SDK produces the subagent/skill/file-read trace the workflow tier
@@ -110,8 +115,26 @@ OPENROUTER_API_KEY=sk-or-... \
 pnpm eval:skills
 ```
 
-> **Gotcha:** always set `EVAL_MODEL` together with `EVAL_BACKEND=openrouter` — the default
-> `claude-haiku-4-5` is an Anthropic ID and OpenRouter won't find it. Use an OpenRouter slug.
+> **Gotcha:** model overrides under `EVAL_BACKEND=openrouter` must use OpenRouter slugs, not
+> Anthropic subscription IDs.
+
+`EVAL_MODEL` remains a backwards-compatible fallback for all three model knobs. With
+`EVAL_BACKEND=openrouter`, the defaults are `deepseek/deepseek-v4-flash-0731` for content-only
+skills and `google/gemini-2.5-flash` for tool-using skills, agents, workflow, and judge.
+
+### Pull-request CI
+
+`.github/workflows/evals.yml` detects the PR diff before exposing any secret. A changed skill or
+agent runs its matching eval directory when present; a missing eval is an explicit successful
+`SKIP` in the job summary. Agent changes also run the general workflow once, while instruction,
+settings, hook, or command changes run that workflow. Shared eval engine/config changes emit every
+suite into a serialized matrix. A selected/full eval without its artifact is an integrity failure.
+
+Configure `OPENROUTER_API_KEY` as a repository Actions secret. Optional repository variables
+`EVAL_CONTENT_MODEL`, `EVAL_TOOL_MODEL`, and `EVAL_JUDGE_MODEL` override the defaults. Model-backed
+execution is skipped for fork PRs because GitHub does not expose trusted secrets to them; the
+workflow deliberately does not use `pull_request_target`. Trusted/manual selected runs fail when
+the secret is missing. `workflow_dispatch` can run either the complete matrix or workflow only.
 
 ### The OpenRouter engine — running EVERY tier (incl. tool tiers) on cheap models
 
@@ -126,7 +149,7 @@ inside `evals/` and needs no code changes to use.
 
 | File | Role |
 |------|------|
-| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any `EVAL_MODEL` slug to OpenRouter, in no-auth mode |
+| `proxy/litellm.config.yaml` | LiteLLM config: a wildcard route forwarding any selected model slug to OpenRouter, in no-auth mode |
 | `proxy/docker-compose.yml` | Runs `ghcr.io/berriai/litellm` on `:4000`, both wire formats on one port |
 | `scripts/litellm-proxy.sh` | `up` / `down` / `wait` wrapper (reads `OPENROUTER_API_KEY` from env, else `~/.devdigest/secrets.json`) |
 | `src/runtime/env.ts` | Points the SDK's `ANTHROPIC_BASE_URL` at `OPENROUTER_BASE_URL` (the proxy) under `EVAL_BACKEND=openrouter` |
@@ -181,67 +204,20 @@ workflow cases:
    model invokes the Skill tool, so it passes.)
 
 > **Isolation note.** `workflowTask` runs with `settingSources:["project"]` + `bypassPermissions`
-> against the live repo. A model that decides to `Write` can touch real files (e.g. your local
-> memory dir) even though `WORKFLOW_ALLOWED_TOOLS` is a read-only list. In CI this is harmless (the
-> checkout is disposable); locally, prefer the Anthropic path or a throwaway clone for the workflow
-> tier.
+> against the live repo. The runtime explicitly denies `Write`, `Edit`, `NotebookEdit`, and `Bash`
+> in addition to its read-only allow-list; keep both controls when extending the harness.
 
-### Wiring it into GitHub Actions (per-PR)
+### GitHub Actions
 
-The engine is CI-ready: bring the proxy up as a step, wait for it, run the tier, tear it down. Put
-the OpenRouter key in the repo's **Actions secrets** as `OPENROUTER_API_KEY` (Settings → Secrets and
-variables → Actions). Create `.github/workflows/<name>.yml` in your repo:
+The canonical implementation is [`.github/workflows/evals.yml`](../.github/workflows/evals.yml),
+not a copy-paste recipe. Its key-free detector emits a `{tier,name,path}` matrix; GitHub runs that
+matrix with `fail-fast: false` and `max-parallel: 1`. Pull requests select suites from their diff,
+while manual runs offer `all` and `workflow` scopes. A trusted selected run without
+`OPENROUTER_API_KEY` fails configuration; a fork PR is an explicit successful skip with no secret.
 
-```yaml
-name: evals
-on:
-  pull_request:
-    paths: ['evals/**', '.claude/**', 'CLAUDE.md']   # only when the harness/artifacts change
-
-permissions:
-  contents: read
-
-jobs:
-  workflow-evals:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: evals
-    env:
-      EVAL_BACKEND: openrouter
-      OPENROUTER_BASE_URL: http://localhost:4000
-      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}   # repo Actions secret
-      EVAL_MODEL: google/gemini-2.5-flash
-      EVAL_JUDGE_MODEL: google/gemini-2.5-flash
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with: { version: 10 }
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: evals/pnpm-lock.yaml
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-
-      # --- the engine ---
-      - run: docker compose -f proxy/docker-compose.yml up -d   # OPENROUTER_API_KEY from job env
-      - run: pnpm proxy:wait                                     # block until the proxy answers
-      - run: pnpm eval:workflow                                  # or eval:agents / eval:skills / eval
-      - if: failure()
-        run: docker compose -f proxy/docker-compose.yml logs --tail 100
-      - if: always()
-        run: docker compose -f proxy/docker-compose.yml down
-```
-
-Notes:
-- ubuntu runners ship Docker + `docker compose`, so no extra setup is needed.
-- The proxy container reads `OPENROUTER_API_KEY` straight from the job `env` (which is fed by the
-  secret) — you don't pass it to `docker compose` explicitly.
-- Because tool tiers cost real tokens, gate on `paths:` (only when the harness/artifacts change) and
-  keep the case count small. For a stricter gate, split into a required `eval:agents`/`eval:skills`
-  job and a non-blocking `eval:workflow` job (activation flakiness, above).
+The job summary records selected/skipped suites, model IDs, trust policy, integrity errors, and the
+outcome of every matrix entry. Eval-without-artifact is a harness integrity error for selected/full
+runs. Configure the secret and optional model variables under repository Actions settings.
 
 ## Module layout — `src/` (the engine)
 
@@ -251,7 +227,7 @@ single barrel `src/index.ts`, never by deep relative path.
 
 ```
 src/
-  config.ts             # all tunables: EVAL_MODEL, EVAL_JUDGE_MODEL, MAX_TURNS, EVAL_CONFIG,
+  config.ts             # tier model tunables + EVAL_MODEL fallback, MAX_TURNS, EVAL_CONFIG,
                         #   thresholds, flaky bounds (20/80), cost-regression ratio (125%), tool allow-lists
   ansi.ts               # color constants + color() helper (one place owns terminal styling)
   git.ts                # gitInfo() — short sha + dirty flag (shared by record.ts and repeat.ts)
@@ -515,8 +491,10 @@ Cheap and orthogonal; the `TrendReporter` keeps writing test-level outcome rows 
 | Env var | Default | Meaning |
 |---------|---------|---------|
 | `EVAL_BACKEND` | `subscription` | runner: `subscription` (Claude Code) or `openrouter` — see [Runners](#runners-claude-code-default-vs-openrouter) |
-| `EVAL_MODEL` | `claude-haiku-4-5` | model under test. Anthropic ID on `subscription`; OpenRouter slug on `openrouter` |
-| `EVAL_JUDGE_MODEL` | `claude-sonnet-5` | judge model (stronger family); same slug-format rule as `EVAL_MODEL` |
+| `EVAL_CONTENT_MODEL` | backend-specific | content-only task model; defaults are listed in [Runners](#runners-claude-code-default-vs-openrouter) |
+| `EVAL_TOOL_MODEL` | backend-specific | tool skill, agent, and workflow model; defaults are listed in [Runners](#runners-claude-code-default-vs-openrouter) |
+| `EVAL_JUDGE_MODEL` | backend-specific | quality-judge model; defaults are listed in [Runners](#runners-claude-code-default-vs-openrouter) |
+| `EVAL_MODEL` | unset | backwards-compatible fallback used for any of the three tier-specific model variables that is not set |
 | `OPENROUTER_API_KEY` | — | required when `EVAL_BACKEND=openrouter`; also in `~/.devdigest/secrets.json` |
 | `OPENROUTER_BASE_URL` | OpenRouter | override to point at a local LiteLLM proxy for non-Anthropic tool-tier models |
 | `EVAL_MAX_TURNS` | `8` | max agent turns per case |

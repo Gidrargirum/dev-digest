@@ -5,9 +5,32 @@
  */
 
 // --- Models -----------------------------------------------------------------
-// Cheap model under test by default; the judge is a stronger family to soften self-preference.
-export const EVAL_MODEL = process.env.EVAL_MODEL ?? "claude-haiku-4-5";
-export const EVAL_JUDGE_MODEL = process.env.EVAL_JUDGE_MODEL ?? "claude-sonnet-5";
+// EVAL_MODEL remains the backwards-compatible override for every tier. The tier-specific knobs
+// let CI use a cheap content model while reserving a tool-capable model for Agent SDK sessions.
+export function resolveModels(env: NodeJS.ProcessEnv = process.env) {
+  const openrouter = (env.EVAL_BACKEND ?? "subscription") === "openrouter";
+  const fallback = env.EVAL_MODEL;
+  return {
+    content:
+      env.EVAL_CONTENT_MODEL ??
+      fallback ??
+      (openrouter ? "deepseek/deepseek-v4-flash-0731" : "claude-haiku-4-5"),
+    tool:
+      env.EVAL_TOOL_MODEL ??
+      fallback ??
+      (openrouter ? "google/gemini-2.5-flash" : "claude-haiku-4-5"),
+    judge:
+      env.EVAL_JUDGE_MODEL ??
+      fallback ??
+      (openrouter ? "google/gemini-2.5-flash" : "claude-sonnet-5"),
+  };
+}
+
+const MODELS = resolveModels();
+export const EVAL_CONTENT_MODEL = MODELS.content;
+export const EVAL_TOOL_MODEL = MODELS.tool;
+export const EVAL_MODEL = EVAL_TOOL_MODEL;
+export const EVAL_JUDGE_MODEL = MODELS.judge;
 export const MAX_TURNS = Number(process.env.EVAL_MAX_TURNS ?? "8");
 
 // --- Configuration tag ------------------------------------------------------

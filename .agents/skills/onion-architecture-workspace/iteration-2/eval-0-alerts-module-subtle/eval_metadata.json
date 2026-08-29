@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "alerts-module-subtle",
+  "prompt": "PR under review: a new `alerts` feature module for `server/` (workspace alerts + a delivery job). Files are in `evals/files/eval-2-1-alerts/`: `service.ts`, `repository.ts`, `adapters.additions.ts` (appended to `server/src/vendor/shared/adapters.ts`), and `container-excerpt.ts` (the new registrations in `platform/container.ts`). It typechecks and `pnpm arch:check` was not run yet. Review it strictly for Onion ring boundaries — for each problem name the exact rule it breaks and where the fix goes.",
+  "assertions": [
+    "Identifies that AlertsService depending on `Container` combined with the container constructing it (`new AlertsService(this, ...)`) produces an actual circular dependency / `no-circular` violation — not only a 'hard to test' or 'service locator' observation",
+    "Recommends the repo's established fix: pass a deps object of the specific ports the service needs (an `AlertsDeps`-style type), the way repoIntel / intent / blast / brief already do — not merely 'inject the container differently'",
+    "Flags that the `AlertSink` port is in the wrong file: it should be in `server/src/ports/` rather than `server/src/vendor/shared/adapters.ts`, because the port is server-only and `vendor/shared` is vendored into the client/browser bundle's type surface",
+    "Flags that `repository.findDeliverable` places business/delivery policy (retry-attempt cap, backoff-time cutoff) in the persistence ring, and says the decision belongs in the service while the repository keeps only the query",
+    "Does not raise more than one clearly-incorrect additional 'violation' (e.g. does not wrongly claim the AlertSink interface vocabulary is vendor-leaky, or that returning `Alert` domain types from the repository is wrong)"
+  ]
+}

@@ -4,7 +4,7 @@
  */
 
 import { query, type Options } from "@anthropic-ai/claude-agent-sdk";
-import { EVAL_MODEL, MAX_TURNS, SPAWN_TOOLS } from "../config.js";
+import { EVAL_TOOL_MODEL, MAX_TURNS, SPAWN_TOOLS } from "../config.js";
 import { REPO_ROOT } from "../artifacts/paths.js";
 import { subscriptionEnv } from "./env.js";
 
@@ -45,6 +45,8 @@ export interface RunOptions {
   stopWhen?: (partial: Pick<Result, "subagents" | "filesRead" | "skillsInvoked" | "toolsUsed">) => boolean;
 }
 
+export const resolveClaudeModel = (opts: RunOptions = {}) => opts.model ?? EVAL_TOOL_MODEL;
+
 /** Run one headless Claude turn-loop and extract what it ACTUALLY did (not its prose). */
 export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<Result> {
   const allowedTools = opts.allowedTools ?? [];
@@ -60,9 +62,13 @@ export async function runClaude(prompt: string, opts: RunOptions = {}): Promise<
   }
 
   const options: Options = {
-    model: opts.model ?? EVAL_MODEL,
+    model: resolveClaudeModel(opts),
     maxTurns: opts.maxTurns ?? MAX_TURNS,
-    permissionMode: "bypassPermissions", // safe: evals only read/plan and tools are allow-listed
+    permissionMode: "bypassPermissions", // no interactive prompt in a headless run…
+    // …so bypassPermissions also neuters allowedTools as a gate. Enforce the read-only contract
+    // explicitly: an eval never writes, and never shells out. This is the real backstop behind
+    // load.ts's MUTATING_TOOLS stripping (which only trims a declaration, it can't bind the model).
+    disallowedTools: ["Write", "Edit", "NotebookEdit", "Bash"],
     systemPrompt,
     allowedTools,
     cwd: opts.cwd ?? REPO_ROOT,

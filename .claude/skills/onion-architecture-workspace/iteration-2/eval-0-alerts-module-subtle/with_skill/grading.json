@@ -1,0 +1,11 @@
+{
+  "expectations": [
+    { "text": "Identifies the Container dependency + container-constructs-it as a genuine no-circular cycle (not just testability/service-locator)", "passed": true, "evidence": "Finding 1: 'Because the container also constructs AlertsService, this is a genuine cycle — dependency-cruiser will report a new no-circular violation, i.e. a 13th entry on top of the baseline of 12.'" },
+    { "text": "Recommends the repo's established fix: an AlertsDeps-style ports object like repoIntel/intent/blast/brief", "passed": true, "evidence": "Finding 1 fix: 'add modules/alerts/types.ts with an AlertsDeps/AlertsPort (the repo-intel / blast / brief pattern)' with concrete constructor + container code." },
+    { "text": "Flags AlertSink port is in the wrong file: server/src/ports/ not vendor/shared/adapters.ts, because server-only + vendor/shared is vendored into the browser bundle", "passed": true, "evidence": "Finding 2: cites SKILL rule 2 lines 84-89 and the server/src/ports/index.ts header comment; 'must not land in the client's vendored type surface'." },
+    { "text": "Flags repository.findDeliverable puts delivery policy (retry-attempt cap, backoff cutoff) in the persistence ring; decision belongs in the service", "passed": true, "evidence": "Finding 3: 'retry policy applied inside the repository' — cites stack-rules 'no business logic in a repository' + anti-pattern 4; fix passes maxAttempts as a param so the repo runs the filter it is told to." },
+    { "text": "No more than one clearly-incorrect additional violation", "passed": true, "evidence": "Only extra is a correct ContainerOverrides-fields note; 'Not findings (checked, OK)' section correctly clears the repo domain-type mapping and job-body placement." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 108.6 }
+}

@@ -1,0 +1,82 @@
+{
+  "comparison": "onion-architecture OLD (snapshot) vs NEW",
+  "change_under_test": [
+    "§11 'Cross-module DATA reach-in — writing another module's table' (added in the previous round)",
+    "§12 'A cross-module `import type` is still a cross-module import' (added this round) — plus a SKILL.md 'Module ownership' bullet and a quick-review checkbox. The OLD skill has neither; its closest coverage is §7, whose worked example is a VALUE import of a constant."
+  ],
+  "prompt": "Review this PR for Onion architecture / ring-boundary violations. Files are in fixtures/digests/: schema.ts, service.ts, repository.ts. The repo already has a notifications module that owns outbound notifications and the notification_outbox table, and a reviews module that owns review runs (its ReviewRunSummary type lives in modules/reviews/types.ts). For each problem: name the exact rule it breaks and which file the fix goes in. Do not pad with speculative issues; if a file is fine, leave it alone.",
+
+  "findings": [
+    {
+      "id": "cross-module-type-import",
+      "type": "DISCRIMINATOR (this round)",
+      "expected": { "NEW": "caught, cites §12", "OLD": "missed or weak — `import type` compiles away and feels exempt; §7's worked example is a value import of a constant" },
+      "file": "digests/service.ts",
+      "rule": "NEW anti-pattern §12 — a cross-module `import type` is still a cross-module import; only vendor/shared/contracts/*, src/ports/* and ../_shared/ cross a module boundary",
+      "must_name": [
+        "digests/service.ts does `import type { ReviewRunSummary } from '../reviews/types.js'`",
+        "modules/reviews/types.ts is the reviews module's private surface, not shared vocabulary — the `type` keyword does not make the import legal, and dependency-cruiser skips type-only edges so arch:check stays green",
+        "the injected `recentRuns` function is itself fine (inversion done right) — the violation is annotating it with reviews' internal type",
+        "fix: if ReviewRunSummary is genuinely shared it moves to vendor/shared/contracts/; otherwise it belongs on the port/callback definition digests already injects, so digests imports nothing from ../reviews/"
+      ]
+    },
+    {
+      "id": "cross-module-data-reachin",
+      "type": "DISCRIMINATOR (previous round)",
+      "expected": { "NEW": "caught, cites §11 / Module ownership", "OLD": "caught but framed loosely as §7 + duplicate-table" },
+      "file": "db/schema/digests.ts + digests/repository.ts",
+      "rule": "NEW: Module ownership / anti-pattern §11",
+      "must_name": [
+        "db/schema/digests.ts declares notificationOutbox, a table the notifications module owns",
+        "DigestsRepository.queueNotification() inserts into notification_outbox — writing another module's table, with no import so arch:check is green",
+        "fix: notification_outbox moves to db/schema/notifications.ts; digests reaches it through the notifications service or a container-wired port"
+      ]
+    },
+    {
+      "id": "cross-module-value-import",
+      "type": "CONTROL (no-regression — both versions must still catch)",
+      "expected": { "NEW": "caught", "OLD": "caught" },
+      "file": "digests/service.ts",
+      "rule": "anti-pattern §7 — cross-module reach-in",
+      "must_name": [
+        "digests/service.ts imports NOTIFICATION_KINDS from ../notifications/constants.js",
+        "fix: shared kinds go to modules/_shared/ or vendor/shared/, or come back from the notifications port"
+      ]
+    },
+    {
+      "id": "service-does-drizzle",
+      "type": "CONTROL",
+      "expected": { "NEW": "caught", "OLD": "caught" },
+      "file": "digests/service.ts",
+      "rule": "SKILL rule 1 (direction) / stack-rules 'Drizzle stops at repository.ts' / service-not-in-db",
+      "must_name": [
+        "list() imports db/client + db/schema and runs a Drizzle select/limit/offset directly",
+        "the injected repo is bypassed for list() (only runDue uses it)",
+        "fix: move the paged query into a DigestsRepository method"
+      ]
+    },
+    {
+      "id": "policy-in-repository",
+      "type": "CONTROL",
+      "expected": { "NEW": "caught", "OLD": "caught" },
+      "file": "digests/repository.ts",
+      "rule": "anti-pattern §4 — no business logic in a repository",
+      "must_name": [
+        "findDue() bakes consecutiveFailures < MAX_CONSECUTIVE_FAILURES into the SQL where-clause",
+        "fix: the decision lives in the service; the repository takes the cutoff as a parameter"
+      ]
+    }
+  ],
+
+  "must_not_flag": [
+    { "what": "DigestsService constructor takes (deps: DigestDeps, repo) — ports, not Container", "why": "correct — rule 4" },
+    { "what": "deps.clock() and deps.recentRuns() being injected functions", "why": "injecting a callback for the cross-module read is the RIGHT inversion — do not flag the injection itself, only the type import used to annotate it" },
+    { "what": "digests/repository.ts importing drizzle-orm, Db, db/schema/digests", "why": "correct for the infrastructure ring" }
+  ],
+
+  "grading": {
+    "total_findings": 5,
+    "success_criterion": "NEW 5/5; OLD misses (or only weakly notes) cross-module-type-import while catching the other 4 -> the §12 addition is the isolated cause of the gap.",
+    "precision_gate": "no must_not_flag hit; at most one clearly-wrong extra finding per run"
+  }
+}

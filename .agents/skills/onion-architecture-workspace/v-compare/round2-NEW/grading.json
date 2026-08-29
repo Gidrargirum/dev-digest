@@ -1,0 +1,15 @@
+{
+  "config": "skill-NEW (§11 + §12 + Module-ownership section + 2 checklist items)",
+  "findings": [
+    { "id": "cross-module-type-import", "type": "DISCRIMINATOR", "caught": true, "score": 1,
+      "evidence": "Finding #5: 'import type { ReviewRunSummary } from ../reviews/types.js, a cross-module type import into another module's private surface (anti-patterns §12)'. Cites §12 by name; 'private surface'. Also correctly leaves the recentRuns injection alone." },
+    { "id": "cross-module-data-reachin", "type": "DISCRIMINATOR (prev round)", "caught": true, "score": 1,
+      "evidence": "Findings #2 + #3: cites 'SKILL one module, one aggregate' + 'anti-patterns §11'; fix = notifications service/port wired in the container" },
+    { "id": "cross-module-value-import", "type": "CONTROL", "caught": true, "score": 1, "evidence": "Finding #4: anti-patterns §7" },
+    { "id": "service-does-drizzle", "type": "CONTROL", "caught": true, "score": 1, "evidence": "Finding #1: Drizzle stops at repository.ts + rule 1 + service-not-in-db; also notes the db singleton vs injected repo" },
+    { "id": "policy-in-repository", "type": "CONTROL", "caught": true, "score": 1, "evidence": "Finding #6: consecutiveFailures < MAX in the where-clause; stack-rules + anti-patterns §4" }
+  ],
+  "false_positives": [],
+  "must_not_flag_check": "PASS — clears the digests table, the DigestDeps port-bag, the repo constructor/row-mapping, the cadence logic",
+  "summary": { "caught": 5.0, "total": 5, "pass_rate": 1.0, "false_positives": 0 }
+}

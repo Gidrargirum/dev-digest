@@ -53,6 +53,7 @@ skills are absent from the matrix **on purpose** and must not be reported:
 |---|---|
 | `engineering-insights` | authoring skill, runs at end of session — reviews nothing |
 | `workflow-retro` | cost/latency post-mortem on a pipeline run, invoked manually — reviews nothing |
+| `dependency-checker` | dependency audit skill, invoked manually — measures and advises, reviews no diff |
 | `mermaid-diagram` | authoring skill for diagrams |
 | `pr-self-review` | this skill |
 | `api-contract-breaking-change` | product content for DevDigest's own Skills Lab, not a repo-diff-review skill — see `.claude/skills/README.md` |

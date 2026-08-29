@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "skill_name": "onion-architecture",
+    "timestamp": "2026-08-28T20:20:00Z",
+    "evals_run": ["notifications-module-review", "slack-adapter-port-review", "reviewer-core-purity-review"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 0, "eval_name": "notifications-module-review", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 65.9, "tokens": 48187, "tool_calls": 8, "errors": 0 },
+      "expectations": [
+        {"text": "Flags service.ts direct DB access", "passed": true, "evidence": "Finding 1 CRITICAL, cites 'Drizzle stops at repository.ts' + import-legality table"},
+        {"text": "Flags Container as constructor param", "passed": true, "evidence": "Finding 2 CRITICAL, cites rule 4 / anti-pattern 2"},
+        {"text": "Flags routes.ts calling repository directly", "passed": true, "evidence": "Finding 3 CRITICAL, cites 'routes.ts may not import repository.ts'"},
+        {"text": "No invented violations", "passed": true, "evidence": "Extras 4-7 all defensible; 'checked, fine' section included"},
+        {"text": "Names correct fix per finding", "passed": true, "evidence": "Each finding has a Fix subsection"}
+      ],
+      "notes": ["Cites rule numbers + import-legality table; 3 CRITICAL + 4 lesser, prioritised"]
+    },
+    {
+      "eval_id": 0, "eval_name": "notifications-module-review", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 60.8, "tokens": 37294, "tool_calls": 5, "errors": 0 },
+      "expectations": [
+        {"text": "Flags service.ts direct DB access", "passed": true, "evidence": "Critical finding 1; notes existing repository is ignored"},
+        {"text": "Flags Container as constructor param", "passed": true, "evidence": "Major finding 4 'service-locator anti-pattern'"},
+        {"text": "Flags routes.ts calling repository directly", "passed": true, "evidence": "Critical finding 2"},
+        {"text": "No invented violations", "passed": true, "evidence": "All extras real; also caught real eq(col,null) bug"},
+        {"text": "Names correct fix per finding", "passed": true, "evidence": "Fix line on every finding"}
+      ],
+      "notes": ["Catches all 3 planted + valid extras; more verbose (8 findings), less tied to named repo rules"]
+    },
+    {
+      "eval_id": 1, "eval_name": "slack-adapter-port-review", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 55.4, "tokens": 46911, "tool_calls": 8, "errors": 0 },
+      "expectations": [
+        {"text": "Flags port leaks vendor SDK", "passed": true, "evidence": "Finding 1 CRITICAL, cites rule 2 + anti-pattern 5 + decision-tree line"},
+        {"text": "Flags service news-up concrete adapter", "passed": true, "evidence": "Finding 3 CRITICAL, cites service->adapters ban + rule 4"},
+        {"text": "Flags token from process.env / eager construction", "passed": true, "evidence": "Finding 5, cites stack-rules SecretsProvider"},
+        {"text": "Recommends domain port + container/ContainerOverrides wiring", "passed": true, "evidence": "Finding 1 fix + Finding 4 'no ContainerOverrides entry'"},
+        {"text": "No invented violations", "passed": true, "evidence": "Extra (port belongs in src/ports/ not vendor/shared, browser-bundle reason) is correct + repo-specific"}
+      ],
+      "notes": ["Uniquely nails vendor/shared vs src/ports/ with browser-bundle rationale; ties to anti-patterns checklist"]
+    },
+    {
+      "eval_id": 1, "eval_name": "slack-adapter-port-review", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 59.3, "tokens": 36690, "tool_calls": 4, "errors": 0 },
+      "expectations": [
+        {"text": "Flags port leaks vendor SDK", "passed": true, "evidence": "Finding 1 + Finding 7 (return path)"},
+        {"text": "Flags service news-up concrete adapter", "passed": true, "evidence": "Finding 4"},
+        {"text": "Flags token from process.env / eager construction", "passed": true, "evidence": "Finding 5"},
+        {"text": "Recommends domain port + container/ContainerOverrides wiring", "passed": true, "evidence": "Required-changes items 1 and 4 (ContainerOverrides not named)"},
+        {"text": "No invented violations", "passed": true, "evidence": "Extras all defensible"}
+      ],
+      "notes": ["Catches all 3 planted + port placement, from general PP knowledge; no ContainerOverrides / browser-bundle specifics; 7 findings"]
+    },
+    {
+      "eval_id": 2, "eval_name": "reviewer-core-purity-review", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 66.7, "tokens": 46638, "tool_calls": 7, "errors": 0 },
+      "expectations": [
+        {"text": "Flags node:fs readFileSync at import", "passed": true, "evidence": "Violation 3, cites rule 3 + anti-pattern 9; notes ESM __dirname"},
+        {"text": "Flags import of RepoIntelRepository (wrong direction)", "passed": true, "evidence": "Violation 1, cites rule 1 + import table + server<->reviewer-core cycle"},
+        {"text": "Flags fetch() to GitHub API", "passed": true, "evidence": "Violation 4, cites rule 3, says use GitHubClient port"},
+        {"text": "Recommends resolved values via ReviewInput", "passed": true, "evidence": "Violation 6 quotes 'inputs are resolved strings not identifiers'; restructure gives pure sync fn"},
+        {"text": "No invented violations", "passed": true, "evidence": "Extras (cross-module reach-in past service, env secret) real + grounded"}
+      ],
+      "notes": ["Adds cross-module reach-in nuance (go through service not repository even inside server/); concrete rubric-as-TS-module fix"]
+    },
+    {
+      "eval_id": 2, "eval_name": "reviewer-core-purity-review", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 48.9, "tokens": 35113, "tool_calls": 2, "errors": 0 },
+      "expectations": [
+        {"text": "Flags node:fs readFileSync at import", "passed": true, "evidence": "Violation 4, notes import-time side effect + __dirname CJS-only"},
+        {"text": "Flags import of RepoIntelRepository (wrong direction)", "passed": true, "evidence": "Violation 1 'the critical finding'; names cycle + arch:check"},
+        {"text": "Flags fetch() to GitHub API", "passed": true, "evidence": "Violation 3 'Network I/O in the domain'"},
+        {"text": "Recommends resolved values via ReviewInput", "passed": true, "evidence": "Restructure: pure enrichSeverity(findings, ctx); server gathers inputs"},
+        {"text": "No invented violations", "passed": true, "evidence": "Extras all real consequences"}
+      ],
+      "notes": ["Matches the skill run almost point-for-point; least differentiated case; fewest tool calls (2)"]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0 },
+      "time_seconds": { "mean": 62.7, "stddev": 5.2, "min": 55.4, "max": 66.7 },
+      "tokens": { "mean": 47245, "stddev": 692, "min": 46638, "max": 48187 }
+    },
+    "without_skill": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0 },
+      "time_seconds": { "mean": 56.3, "stddev": 5.4, "min": 48.9, "max": 60.8 },
+      "tokens": { "mean": 36366, "stddev": 900, "min": 35113, "max": 37294 }
+    },
+    "delta": { "pass_rate": "+0.00", "time_seconds": "+6.4", "tokens": "+10879" }
+  },
+  "notes": [
+    "Pass rate is identical (100%) in both configurations across all 3 evals — the assertions check RECALL of the 3 planted violations, and unaided Claude in this repo already finds all of them (it can read the root and server/ CLAUDE.md, which name Onion, SecretsProvider, vendor/shared's two copies and arch:check). The assertions are non-discriminating for this skill on these fixtures.",
+    "Where the skill changes the output is PRECISION and VOCABULARY, which the current assertions don't score: with-skill reviews cite specific rule numbers, the import-legality table, and numbered anti-patterns; they are shorter and prioritised (3 CRITICAL + lesser) vs the baseline's flatter 7-8 item lists.",
+    "Strongest skill-only insight observed: eval-1 with_skill flags that the Slack port belongs in server/src/ports/ rather than vendor/shared *because vendor/shared is vendored into the browser bundle's type surface* — baseline flags the placement but not this reason.",
+    "eval-2 (reviewer-core purity) is the least differentiated: baseline and skill outputs are nearly identical. I/O-in-the-domain is a widely-known clean-architecture rule, so the skill adds little there.",
+    "Cost of the skill: ~+30% tokens (~+10.9k) and ~+6s per review, for no recall gain on these fixtures.",
+    "To make this benchmark discriminating, the fixtures need violations that are repo-specific and subtle (e.g. a port that looks fine but leaks one vendor noun; a service taking Container that produces a real dependency cycle only because the container also builds it; a baseline-regeneration to silence arch:check) and assertions that score whether the review names the correct rule and the correct fix location, not just 'mentions the problem'.",
+    "Also worth adding: a negative/adversarial fixture that is actually correct, to check the skill doesn't invent violations (all 6 runs here scored the 'no invented violations' assertion as pass, but nothing tested a clean input)."
+  ]
+}

@@ -24,6 +24,8 @@ for a client test run.
 | `reviewer-core/**` touched | `npm run typecheck` && `npm test` | `reviewer-core` | B4 |
 | `mcp/**` touched | `pnpm typecheck` | `mcp` | B4 |
 | `mcp/**` touched | `pnpm test` | `mcp` | B4 |
+| `evals/**` or `.github/workflows/evals.yml` touched | `pnpm typecheck` | `evals` | B4 |
+| `evals/**` or `.github/workflows/evals.yml` touched | `pnpm test:ci` | `evals` | B4 |
 | any `vendor/shared/**` touched | `node scripts/sync-shared.mjs --check` | repo root | B1 |
 | `.claude/skills/**` or `skills-lock.json` touched | `node scripts/check-skills-lock.mjs` | repo root | B10 |
 
@@ -38,10 +40,11 @@ change triggers the server-side arch gates, not just its own.
 
 1. `sync-shared.mjs --check` — milliseconds, and B1 makes every downstream type
    error meaningless anyway.
-2. typechecks.
+2. typechecks (including the eval engine when touched).
 3. `arch:check`, then `arch:ratchet`.
 4. `client` lint.
-5. test suites — slowest, last.
+5. hermetic test suites — slowest, last. Model-backed evals run only in `evals.yml`, not this
+   local mechanical gate, because they require a trusted OpenRouter secret.
 
 Stop early only for B1: if the contracts are out of sync, say so and skip the
 rest rather than reporting the cascade it causes.

@@ -31,6 +31,13 @@ export interface QualityCase {
   /** Judge score gate (default 0.6). */
   threshold?: number;
   maxTurns?: number;
+  /**
+   * Opt a procedural skill/agent case into a real tool-using run against the repo. Omit to keep
+   * the artifact's own default (a skill's `allowed-tools:` frontmatter, or content-only when it
+   * declares none; an agent's `tools:` frontmatter). `[]` forces content-only. Mutating tools
+   * (Write/Edit/Bash) are stripped by the loader regardless of what is listed here.
+   */
+  tools?: string[];
 }
 export type SkillCase = QualityCase;
 export type AgentCase = QualityCase;
@@ -68,12 +75,19 @@ export type WorkflowCase =
       maxTurns?: number;
     };
 
-/** Did a skill engage? Either an explicit Skill tool-call, or reading its SKILL.md. */
-export function activated(result: Result, skill: string): boolean {
-  const bySkill = result.skillsInvoked.some((s) => s === skill || s.endsWith(`:${skill}`));
-  const byRead = result.filesRead.some((f) => f.includes(`skills/${skill}/SKILL.md`));
+/**
+ * Did a skill engage? Either an explicit Skill tool-call, or reading its SKILL.md. Takes the
+ * loose `{ skillsInvoked, filesRead }` shape so it works on both a finished Result and the
+ * partial trace `stopWhen` receives mid-session.
+ */
+export function skillEngaged(p: Pick<Result, "skillsInvoked" | "filesRead">, skill: string): boolean {
+  const bySkill = p.skillsInvoked.some((s) => s === skill || s.endsWith(`:${skill}`));
+  const byRead = p.filesRead.some((f) => f.includes(`skills/${skill}/SKILL.md`));
   return bySkill || byRead;
 }
+
+/** Did a skill engage? Either an explicit Skill tool-call, or reading its SKILL.md. */
+export const activated = (result: Result, skill: string): boolean => skillEngaged(result, skill);
 
 // --- Runners ----------------------------------------------------------------
 
@@ -83,7 +97,9 @@ function runQualityCases(artifact: string, cases: QualityCase[], task: Task): vo
   for (const c of cases) {
     test(c.name, async () => {
       const threshold = c.threshold ?? DEFAULT_THRESHOLD;
-      const result = await task(c.prompt, artifact, { maxTurns: c.maxTurns });
+      const runOpts: RunOptions = { maxTurns: c.maxTurns };
+      if (c.tools !== undefined) runOpts.allowedTools = c.tools;
+      const result = await task(c.prompt, artifact, runOpts);
       logTrace(c.name, result);
 
       // measure → record → assert. Everything measurable runs in the try; record() fires in the
@@ -132,7 +148,15 @@ export function runWorkflowCases(cases: WorkflowCase[]): void {
           record(c.name, { result });
         }
       } else if (c.kind === "activation") {
-        const result = await workflowTask(c.prompt, { maxTurns: c.maxTurns });
+        // Positive case: stop the moment the skill engages — a heavy procedural skill
+        // (e.g. pr-self-review) would otherwise burn every turn on tools the eval denies it
+        // and end in error_max_turns, which the record layer scores as a failed run even
+        // though the skill DID activate. Negative case: run to completion — "it never
+        // engaged" can only be proven by the full session, so no early stop.
+        const result = await workflowTask(c.prompt, {
+          maxTurns: c.maxTurns,
+          stopWhen: c.shouldActivate ? (p) => skillEngaged(p, c.skill) : undefined,
+        });
         logTrace(c.name, result);
         try {
           expect(
@@ -149,9 +173,6 @@ export function runWorkflowCases(cases: WorkflowCase[]): void {
         const subs = c.expectSubagents ?? [];
         const skls = c.expectSkills ?? [];
         const files = c.expectFilesRead ?? [];
-        const skillEngaged = (p: { skillsInvoked: string[]; filesRead: string[] }, skill: string) =>
-          p.skillsInvoked.some((s) => s === skill || s.endsWith(`:${skill}`)) ||
-          p.filesRead.some((f) => f.includes(`skills/${skill}/SKILL.md`));
         const result = await workflowTask(c.prompt, {
           maxTurns: c.maxTurns,
           stopWhen: (p) =>

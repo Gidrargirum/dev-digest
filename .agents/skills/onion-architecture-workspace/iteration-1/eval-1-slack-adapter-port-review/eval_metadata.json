@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "slack-adapter-port-review",
+  "prompt": "PR under review: a new Slack adapter for `server/`. Files are in `evals/files/eval-2-slack/`: `adapters.additions.ts` is what gets appended to `server/src/vendor/shared/adapters.ts`, `slack-adapter.ts` is the implementation under `src/adapters/slack/`, and `service-excerpt.ts` shows how `modules/reviews/service.ts` calls it. Check whether this respects our ports-and-adapters / onion boundaries and say what needs to change.",
+  "assertions": [
+    "Flags that the SlackClient port leaks the vendor SDK: it imports @slack/web-api types into vendor/shared and its method signatures are in Slack's vocabulary rather than domain terms",
+    "Flags that ReviewsService instantiates `new SlackWebApiClient()` directly instead of depending on the SlackClient interface injected via the container",
+    "Flags that the adapter reads the token from process.env instead of SecretsProvider (and/or constructs the client eagerly instead of lazily)",
+    "Recommends defining the port in domain vocabulary and wiring the adapter through platform/container.ts + ContainerOverrides",
+    "Does not invent violations that are not present (no more than one clearly-wrong extra finding)"
+  ]
+}

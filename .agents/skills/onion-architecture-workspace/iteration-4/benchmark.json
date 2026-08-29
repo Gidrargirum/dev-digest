@@ -1,0 +1,28 @@
+{
+  "metadata": {
+    "skill_name": "onion-architecture",
+    "timestamp": "2026-08-29T00:15:00Z",
+    "eval": "widgets (single consolidated mini-repo, 11 planted findings + 5 must-not-flag)",
+    "runs_per_configuration": 1
+  },
+  "run_summary": {
+    "with_skill":    { "pass_rate": 0.90, "caught": 9.0, "total": 10, "false_positives": 0, "time_seconds": 100.9, "tokens": 55985, "tool_calls": 15 },
+    "without_skill": { "pass_rate": 0.65, "caught": 6.5, "total": 10, "false_positives": 0, "time_seconds": 121.9, "tokens": 55879, "tool_calls": 15 },
+    "delta": { "pass_rate": "+0.25", "time_seconds": "-21.0", "tokens": "-106" }
+  },
+  "note_on_totals": "Recounted at 10 findings after folding service-locator-tagger into service-container-cycle (same root cause; both runs treated the tagger lookup as part of the Container-injection problem).",
+  "per_finding": {
+    "both_caught":        ["service-does-drizzle", "routes-call-repository", "validate-in-handler", "port-speaks-vendor", "adapter-reads-env-secret"],
+    "skill_only":         ["service-container-cycle (baseline missed the cycle and endorsed a Container-injection variant)", "policy-in-repository (baseline explicitly cleared the repository)", "contract-carries-transport-envelope (baseline missed)", "repository-returns-row-type (skill puts the fix in the repository; baseline puts it on the service and clears the repo)"],
+    "baseline_only":      ["port-in-vendor-shared (skill missed that the server-only port belongs in src/ports/; baseline caught it as a secondary note)"],
+    "both_missed":        []
+  },
+  "notes": [
+    "The consolidated mini-repo works as a discriminator: Δ +0.25 pass-rate, the largest gap across all four iterations, with 0 false positives on either side (the negative-control patterns held).",
+    "Consistent with iterations 2 and 3: the policy-in-repository finding (anti-pattern 4) is the one unaided Claude reliably misses — here the baseline explicitly wrote 'widgets/repository.ts ... Leave as is'.",
+    "New signal this fixture surfaces: on the Container-injection cycle, the baseline not only missed it but recommended `this.repo = new XRepository(container.db)` — a variant of the same anti-pattern. The skill run named the no-circular cycle and the deps-object fix.",
+    "Also new: the row-type leak. Both configs saw the symptom; only the skill run attributed it to the repository ring ('map inside the repository, methods return Widget') — the baseline put the fix on service.get() and cleared repository.ts.",
+    "Applied after this run: folded service-locator-tagger into service-container-cycle in expected-findings.json (10 findings now); renamed fixtures/adapters/llm/openai.ts -> openai-tagger.ts to match its header and drop the collision both runs noted.",
+    "Timing inverted this run (baseline slower) — noise at n=1; the token cost of the skill was ~flat here."
+  ]
+}

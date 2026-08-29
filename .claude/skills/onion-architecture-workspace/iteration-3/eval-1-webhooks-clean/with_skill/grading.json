@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Verdict: 'The layering is sound ... the four rules hold' + full rule-by-rule + 'Quick review pass' checklist",
+      "passed": true,
+      "evidence": "Verdict: 'The layering is sound ... the four rules hold' + full rule-by-rule + 'Quick review pass' checklist"
+    },
+    {
+      "text": "getDelivery pass-through not flagged; 'No business logic in the repository ... Correct'",
+      "passed": true,
+      "evidence": "getDelivery pass-through not flagged; 'No business logic in the repository ... Correct'"
+    },
+    {
+      "text": "platform/errors import explicitly cleared: 'allowed anywhere'",
+      "passed": true,
+      "evidence": "platform/errors import explicitly cleared: 'allowed anywhere'"
+    },
+    {
+      "text": "secret:string + EnqueueReviewPort/GitHubClient injection explicitly endorsed ('better than the repos/agents/reviews modules that still take Container')",
+      "passed": true,
+      "evidence": "secret:string + EnqueueReviewPort/GitHubClient injection explicitly endorsed ('better than the repos/agents/reviews modules that still take Container')"
+    },
+    {
+      "text": "Only note is new Date() clock read, explicitly 'does not break any of the four rules and does not block'",
+      "passed": true,
+      "evidence": "Only note is new Date() clock read, explicitly 'does not break any of the four rules and does not block'"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

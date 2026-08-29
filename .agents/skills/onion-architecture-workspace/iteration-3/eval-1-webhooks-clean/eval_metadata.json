@@ -1,0 +1,12 @@
+{
+  "eval_id": 1,
+  "eval_name": "webhooks-clean",
+  "prompt": "PR under review: a new `webhooks` module for `server/` (receives GitHub webhooks, records deliveries, enqueues reviews for pull events). Files are in `evals/fixtures/webhooks-clean/`: `routes.ts`, `service.ts`, `repository.ts`. Review it for Onion ring / layering violations. If the layering is sound, say so plainly; if not, name each rule broken and where the fix goes.",
+  "assertions": [
+    "Concludes that the module's Onion / ring layering is sound \u2014 states there is no dependency-direction, composition-root, cross-module, or repository-boundary violation",
+    "Does NOT flag the thin `getDelivery` pass-through as an 'anemic service' / 'pointless layer' violation",
+    "Does NOT flag the `import { NotFoundError, AppError } from '../../platform/errors.js'` in the service as a layering violation",
+    "Does NOT flag the service taking a `secret: string` constructor argument, or taking the `EnqueueReviewPort` / `GitHubClient` as injected interfaces, as wrong",
+    "Does not invent a ring violation to justify a 'changes requested' verdict; at most raises a non-architectural setup note (e.g. that `body: z.string()` needs a raw-body content-type parser)"
+  ]
+}

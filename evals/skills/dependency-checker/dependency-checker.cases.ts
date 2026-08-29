@@ -1,83 +1,118 @@
 import type { SkillCase } from "../../src/index.js";
+import { fixtureReader } from "../../src/index.js";
 
-// This skill's job is to analyze real files (package.json, tsconfig.json, node_modules sizes),
-// but "quality" cases run with no tools (skillTask measures the SKILL.md content in isolation —
-// see tasks.ts). So each prompt inlines a small synthetic dataset the skill can reason over
-// directly, standing in for what the skill would normally gather itself with Read/Bash/Grep.
+const fx = fixtureReader(import.meta.url);
 
-const REPO_DATA = `Here is the data you'd normally gather yourself — treat it as already collected, and produce the report directly from it (do not ask for tool access or more data).
+// This skill's method IS the tooling: Glob every package.json, Read each, derive the internal
+// graph from tsconfig paths, Grep src/ for unused/phantom deps. So the cases run WITH tools
+// (Read/Grep/Glob — Bash is stripped by the loader, so `du` can't run) against the REAL repo,
+// the way `skillTask` now allows. The one thing tools can't get in this sandbox — on-disk
+// sizes — is handed in as a pre-collected fixture; the skill's own body says to treat supplied
+// `du` output as measured.
+//
+// `tools` is left to the skill's `allowed-tools:` frontmatter (→ Read, Grep, Glob) for the repo
+// cases; the last case pins `tools: []` to keep one fast, cheap content-only check of the report
+// rubric in isolation.
 
-server/package.json dependencies: fastify@5.1.0, drizzle-orm@0.36.0, zod@3.23.8, pg@8.13.0, moment@2.30.1
-server/package.json devDependencies: vitest@2.1.4, typescript@5.6.3, tsx@4.19.0
-client/package.json dependencies: next@15.0.3, react@19.0.0, react-dom@19.0.0, @tanstack/react-query@5.59.0, zod@3.22.4, date-fns@4.1.0
-client/package.json devDependencies: vitest@2.1.4, typescript@5.6.3, tailwindcss@3.4.14
-reviewer-core/package.json dependencies: zod@3.23.8
-reviewer-core/package.json devDependencies: typescript@5.6.3
-e2e/package.json dependencies: (none runtime)
-e2e/package.json devDependencies: playwright@1.48.2, typescript@5.6.3
+const SIZES = fx("du-sizes.txt");
 
-Installed sizes (du -sh):
-server/node_modules/moment: 4.2M
-server/node_modules/drizzle-orm: 8.1M
-server/node_modules/fastify: 6.5M
-server/node_modules/pg: 3.8M
-server/node_modules/zod: 2.1M
-client/node_modules/next: 132M
-client/node_modules/react-dom: 6.9M
-client/node_modules/date-fns: 22M
-client/node_modules/zod: 1.9M
-reviewer-core/node_modules/zod: 2.1M
-e2e/node_modules/playwright: 210M
+const FULL_PROMPT = `Run a full dependency check on this repository — the working directory is the repo root. Discover the packages yourself, read their package.json and tsconfig.json, and produce the full report: graph, size tables, classification findings, prioritized action list, summary.
 
-server/package.json also declares zod@3.23.8, client/package.json declares zod@3.22.4, reviewer-core/package.json declares zod@3.23.8 — three different resolved zod versions across packages.
+${SIZES}`;
 
-grep for imports crossing package boundaries:
-- server/src/routes/reviews.ts imports types from "@shared/review-types" (alias to server/src/vendor/shared)
-- server/src/services/review-service.ts imports "reviewer-core/src/pipeline.js" directly by relative path (not via the package's public entry point)
-- client/src/lib/api-types.ts imports "@shared/review-types" (same alias as server)
-- grep found no import of "moment" anywhere under server/src — only present in package.json`;
+const INTERNAL_PROMPT = `Analyze this repo's dependencies, with particular attention to how the packages depend on each other internally. The working directory is the repo root — inspect the real files.
+
+${SIZES}`;
+
+const PRIORITIZE_PROMPT = `We think some dependencies are misplaced, unused, or duplicated across packages. Inspect the real repo (working directory = repo root) and tell us what to prioritize fixing first.
+
+${SIZES}`;
+
+// Synthetic, deliberately small, and shaped like the real repo (6 packages, no workspace,
+// vendored @devdigest/shared). Used only for the content-only rubric case.
+const SYNTHETIC_DATA = `Treat this as already collected — produce the report directly, do not ask for tool access.
+
+Packages (no workspace; each has its own package.json + node_modules):
+  server        deps: fastify@5.2.0, drizzle-orm@0.38.3, zod@3.25.76, dependency-cruiser@17.4.3, openai@4.104.0
+                devDeps: vitest@2.1.9, typescript@5.9.3, drizzle-kit@0.30.1
+  client        deps: next@15.1.3, react@19.0.0, zod@3.25.76, mermaid@11.15.0, lucide-react@0.469.0
+                devDeps: vitest@2.1.9, typescript@5.9.3, tailwindcss@4.0.0
+  reviewer-core deps: openai@4.104.0, zod@3.25.76        devDeps: typescript@5.9.3, vitest@2.1.9   (NO pnpm-lock.yaml)
+  mcp           deps: @modelcontextprotocol/sdk@1.30.0, zod@3.25.76
+  e2e           devDeps: typescript@5.9.3, tsx@4.23.12   (NO pnpm-lock.yaml)
+  evals         deps: openai@4.104.0   devDeps: typescript@5.6.0, vitest@2.1.0
+
+@devdigest/shared is vendored (copied into server/src/vendor/shared AND client/src/vendor/shared) — not an npm install.
+
+Installed sizes (du -sk, KB):
+  server/node_modules/typescript 23388, server/node_modules/js-tiktoken 22008, server/node_modules/dependency-cruiser 1568
+  client/node_modules/next 155960, client/node_modules/mermaid 77116, client/node_modules/typescript 23388
+  reviewer-core/node_modules/typescript 23396, mcp/node_modules/typescript 23396, e2e/node_modules/typescript 23396, evals/node_modules/typescript 23388
+
+Imports crossing package boundaries (grep):
+  server/src/adapters/github/octokit.ts imports "@devdigest/reviewer-core" (tsconfig path alias to ../reviewer-core/src)
+  mcp/src/index.ts imports "@devdigest/shared" (tsconfig path alias to ../server/src/vendor/shared)
+  grep found no import of "dependency-cruiser" anywhere under server/src — it is only invoked from the "arch:check" package.json script.`;
 
 export const cases: SkillCase[] = [
   {
-    name: "full report follows the required 5-section structure with a Mermaid graph",
+    name: "full report: discovers all 6 packages, draws a valid graph, and grounds findings in the real tree",
     kind: "quality",
-    prompt: `Run a dependency check on this repo. I want the full report: graph, sizes, prioritized findings, recommendations.\n\n${REPO_DATA}`,
-    grounding: ["```mermaid", "flowchart"],
+    prompt: FULL_PROMPT,
+    grounding: ["```mermaid"],
     practices: [
-      "the report has a section named 'Scope' listing which packages (client, server, reviewer-core, e2e) were analyzed",
-      "the report includes a Mermaid diagram (a fenced ```mermaid code block using flowchart) showing dependency relationships between packages",
-      "the report has a section with a size breakdown table showing dependencies and their installed size, not just a vague size statement",
-      "the report has a 'Findings & Priorities' section (or equivalently named) that groups findings under explicit severity tiers such as P0, P1, P2, or Info — not an unranked bullet list",
-      "the report ends with a Summary section giving 3-5 concrete, actionable takeaways ordered by priority",
-      "every finding names a specific package, dependency, or file rather than giving generic advice like 'consider optimizing dependencies'",
+      "a Scope line (or section) names all six packages actually present — server, client, reviewer-core, mcp, e2e, evals",
+      "the report contains a fenced ```mermaid block whose first content line is a valid declaration (`graph` or `flowchart` plus a direction such as TD or LR) and which contains at least one `-->` edge",
+      "the two vendored `@devdigest/shared` copies (server/src/vendor/shared and client/src/vendor/shared) are shown as internal dependency edges and explicitly excluded from the size math",
+      "there is a size table with a row per package showing a concrete node_modules total (e.g. server 235 MB, client 644 MB), not a single vague sentence about size",
+      "findings are grouped under explicit priority tiers labelled P1/P2/P3/P4 (or an equivalent explicit ranking), not one flat unranked list",
+      "every listed finding ends in a concrete action naming a verb — drop, replace with, move to devDependencies, dedupe to <version>, or keep — never a vague 'consider optimizing'",
+      "the report ends with a Summary of 3-5 prioritized, actionable takeaways",
+    ],
+    threshold: 0.8,
+    maxTurns: 40,
+  },
+  {
+    name: "separates internal path-alias edges from npm dependencies and does not invent a workspace",
+    kind: "quality",
+    prompt: INTERNAL_PROMPT,
+    practices: [
+      "internal cross-package links (the tsconfig `@devdigest/*` path aliases, the vendored `@devdigest/shared` copies) are presented in their own graph or section, separate from the external npm-dependency tables — not merged into one flat dependency list",
+      "the report treats today's layout as no-workspace / independent per-package installs (quotable phrasing such as 'no-workspace', 'each package has its own package.json / node_modules', 'duplicated across node_modules trees'); any mention of a pnpm workspace / `workspace:*` appears only as a future recommendation, never as how dependencies resolve now",
+      "the two vendored `@devdigest/shared` copies under server/src/vendor/shared and client/src/vendor/shared are reported as PRESENT (the skill is expected to verify them on disk, not guess from tsconfig) — a claim that they are missing / phantom is a failure",
+      "reviewer-core and e2e are flagged as missing a pnpm-lock.yaml (a reproducibility risk), distinct from the packages that have one",
+    ],
+    threshold: 0.75,
+    maxTurns: 40,
+  },
+  {
+    name: "prioritized findings are specific, tiered, and advisory — not executed",
+    kind: "quality",
+    prompt: PRIORITIZE_PROMPT,
+    practices: [
+      "every finding carries an explicit priority tier (P1/P2/P3/P4 or an equivalent explicit rank), none left unranked",
+      "`dependency-cruiser` declared in server/package.json `dependencies` while only ever invoked from the `arch:check` script is called out as a misplaced dependency that belongs in devDependencies, naming the file",
+      "the cross-package on-disk duplication (the same name+version installed in multiple node_modules trees, e.g. typescript in all six) is quantified as one headline number or size, not just mentioned",
+      "any transitive / sub-tree saving from removing a package is labelled as an upper bound ('up to …'), never asserted as a certain figure",
+      "removing or moving a dependency is phrased as a recommendation for the developer to confirm, not reported as an action the skill has taken",
+    ],
+    threshold: 0.8,
+    maxTurns: 40,
+  },
+  {
+    name: "content-only: report rubric holds when all data is pre-supplied",
+    kind: "quality",
+    prompt: `Run a dependency check. I want the full report: graph, sizes, prioritized findings, recommendations.\n\n${SYNTHETIC_DATA}`,
+    tools: [],
+    grounding: ["```mermaid"],
+    practices: [
+      "the report has the five sections the skill defines — a dependency graph, a size breakdown, classification findings, a prioritized action list, and a summary",
+      "findings are labelled with explicit P1/P2/P3/P4 tiers rather than left unranked",
+      "`dependency-cruiser`, declared in server but imported nowhere under server/src, is called out explicitly as a misplaced or unused dependency",
+      "the declared version drift in evals (typescript ^5.6.0 / vitest ^2.1.0 vs the rest) is noted as version skew",
+      "removing `dependency-cruiser` from `dependencies` is presented as a recommendation to confirm, not something already done",
     ],
     threshold: 0.7,
-    maxTurns: 10,
-  },
-  {
-    name: "distinguishes internal (path-alias) dependencies from external npm dependencies",
-    kind: "quality",
-    prompt: `This repo isn't a monorepo — server, client, reviewer-core, and e2e share code via TypeScript path aliases, not workspace:* packages. Analyze our dependencies, including how these packages depend on each other internally.\n\n${REPO_DATA}`,
-    practices: [
-      "the answer explicitly distinguishes internal cross-package dependencies (the @shared/review-types alias and the direct relative import into reviewer-core/src/pipeline.js) from external npm package dependencies, rather than treating them as the same kind of dependency",
-      "the answer flags server/src/services/review-service.ts importing reviewer-core/src/pipeline.js by relative path instead of through reviewer-core's public entry point as a P0-tier or otherwise explicitly called-out issue",
-      "the answer does not claim these packages are linked via workspace:* or pnpm workspaces, since the project explicitly is not a monorepo",
-    ],
-    threshold: 0.6,
-    maxTurns: 10,
-  },
-  {
-    name: "severity tiers are used consistently and recommendations are specific, not vague",
-    kind: "quality",
-    prompt: `We suspect some npm dependencies in server/ and client/ are unused or duplicated across packages with different versions. Check our dependencies and tell me what to prioritize fixing first.\n\n${REPO_DATA}`,
-    practices: [
-      "findings are explicitly labeled with one of the defined severity tiers (P0, P1, P2, or Info) rather than left unranked",
-      "the three different zod versions across server, client, and reviewer-core are called out explicitly as version drift",
-      "moment being declared in server/package.json but never imported anywhere under server/src is called out explicitly as an unused dependency",
-      "each recommendation names a specific package name and package.json/file location (e.g. server/package.json, moment, zod) rather than a generic suggestion",
-      "removing a dependency (e.g. moment) is presented as a recommendation for the user to confirm, not something already executed",
-    ],
-    threshold: 0.6,
     maxTurns: 10,
   },
 ];

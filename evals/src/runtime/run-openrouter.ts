@@ -12,10 +12,12 @@
  */
 
 import OpenAI from "openai";
-import { EVAL_MODEL } from "../config.js";
+import { EVAL_CONTENT_MODEL } from "../config.js";
 import type { Result, RunOptions } from "./run-claude.js";
 
 const BASE_URL = (process.env.OPENROUTER_BASE_URL ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
+
+export const resolveOpenRouterModel = (opts: RunOptions = {}) => opts.model ?? EVAL_CONTENT_MODEL;
 
 /** Run one content-only turn against an OpenAI-compatible endpoint and shape it as a Result. */
 export async function runOpenRouter(prompt: string, opts: RunOptions = {}): Promise<Result> {
@@ -37,7 +39,7 @@ export async function runOpenRouter(prompt: string, opts: RunOptions = {}): Prom
   let isError = false;
   try {
     const res = await client.chat.completions.create({
-      model: opts.model ?? EVAL_MODEL,
+      model: resolveOpenRouterModel(opts),
       temperature: 0,
       messages: [
         { role: "system", content: system },

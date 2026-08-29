@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "'(1) Cross-module reach-in - brief/service.ts imports ../blast/repository.js ... breaking no-cross-module-imports and anti-pattern 7' + '(2) names a concrete infrastructure class (new BlastRepository(...))'",
+      "passed": true,
+      "evidence": "'(1) Cross-module reach-in - brief/service.ts imports ../blast/repository.js ... breaking no-cross-module-imports and anti-pattern 7' + '(2) names a concrete infrastructure class (new BlastRepository(...))'"
+    },
+    {
+      "text": "'widen BriefBlastSource, implement the read on BlastService, consume via this.deps.blast ... container.brief already injects this.blast'",
+      "passed": true,
+      "evidence": "'widen BriefBlastSource, implement the read on BlastService, consume via this.deps.blast ... container.brief already injects this.blast'"
+    },
+    {
+      "text": "'(4) Reuse of blast BLAST_SYMBOL_CAP/formatSymbolList across the boundary - keep behind the port, or promote to modules/_shared/'",
+      "passed": true,
+      "evidence": "'(4) Reuse of blast BLAST_SYMBOL_CAP/formatSymbolList across the boundary - keep behind the port, or promote to modules/_shared/'"
+    },
+    {
+      "text": "Extras (db-handle leak via this.deps.db -> service-not-in-db; methods do not exist on BlastRepository) are correct, not invented",
+      "passed": true,
+      "evidence": "Extras (db-handle leak via this.deps.db -> service-not-in-db; methods do not exist on BlastRepository) are correct, not invented"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  }
+}

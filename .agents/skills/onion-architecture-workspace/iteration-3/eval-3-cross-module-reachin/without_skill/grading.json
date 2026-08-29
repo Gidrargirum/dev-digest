@@ -1,0 +1,30 @@
+{
+  "expectations": [
+    {
+      "text": "'(1) Illegal cross-module source imports (../blast/repository.js, ../blast/helpers.js) violate dependency-cruiser no-cross-module-imports' + '(2) new BlastRepository(...) - adapter construction belongs to the composition root'",
+      "passed": true,
+      "evidence": "'(1) Illegal cross-module source imports (../blast/repository.js, ../blast/helpers.js) violate dependency-cruiser no-cross-module-imports' + '(2) new BlastRepository(...) - adapter construction belongs to the composition root'"
+    },
+    {
+      "text": "'brief already has the sanctioned channel in the BriefBlastSource port ... wired via container.brief as deps.blast'",
+      "passed": true,
+      "evidence": "'brief already has the sanctioned channel in the BriefBlastSource port ... wired via container.brief as deps.blast'"
+    },
+    {
+      "text": "'(4) Importing blast private BLAST_SYMBOL_CAP / formatSymbolList couples the Brief output to another module internal tuning/presentation helpers; brief should own its constants'",
+      "passed": true,
+      "evidence": "'(4) Importing blast private BLAST_SYMBOL_CAP / formatSymbolList couples the Brief output to another module internal tuning/presentation helpers; brief should own its constants'"
+    },
+    {
+      "text": "'(3) this.deps.db does not (and must not) exist on BriefDeps' is correct, not invented",
+      "passed": true,
+      "evidence": "'(3) this.deps.db does not (and must not) exist on BriefDeps' is correct, not invented"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 0,
+    "total": 4,
+    "pass_rate": 1.0
+  }
+}

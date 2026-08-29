@@ -1,0 +1,104 @@
+{
+  "metadata": {
+    "skill_name": "onion-architecture",
+    "timestamp": "2026-08-28T23:55:00Z",
+    "evals_run": ["alerts-module-subtle", "webhooks-clean-adversarial", "reviewer-core-calibrate-subtle"],
+    "runs_per_configuration": 1
+  },
+  "runs": [
+    {
+      "eval_id": 0, "eval_name": "alerts-module-subtle", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 108.6, "tokens": 56525, "tool_calls": 13, "errors": 0 },
+      "expectations": [
+        {"text": "Container+construction = genuine no-circular cycle", "passed": true, "evidence": "'a 13th entry on top of the baseline of 12'"},
+        {"text": "Recommends AlertsDeps ports object (repoIntel/blast/brief pattern)", "passed": true, "evidence": "'add modules/alerts/types.ts with an AlertsDeps/AlertsPort'"},
+        {"text": "AlertSink -> src/ports/ not vendor/shared (browser bundle)", "passed": true, "evidence": "cites SKILL rule 2 lines 84-89 + ports/index.ts header"},
+        {"text": "repository.findDeliverable puts retry policy in persistence ring", "passed": true, "evidence": "Finding 3, anti-pattern 4, fix = pass maxAttempts param"},
+        {"text": "<=1 clearly-wrong extra", "passed": true, "evidence": "only correct extras; 'Not findings' section"}
+      ],
+      "notes": ["All 3 planted issues + precise rule citations; 108s / 13 tool calls (read sibling modules + ports/index.ts)"]
+    },
+    {
+      "eval_id": 0, "eval_name": "alerts-module-subtle", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 0.8, "passed": 4, "failed": 1, "total": 5, "time_seconds": 65.0, "tokens": 53549, "tool_calls": 10, "errors": 0 },
+      "expectations": [
+        {"text": "Container+construction = genuine no-circular cycle", "passed": true, "evidence": "'the container builds the service while the service references the container'"},
+        {"text": "Recommends AlertsDeps ports object (repoIntel/blast/brief pattern)", "passed": true, "evidence": "'add a small AlertsDeps type (as blast/types.ts / brief/types.ts do)'"},
+        {"text": "AlertSink -> src/ports/ not vendor/shared (browser bundle)", "passed": true, "evidence": "quotes ports/index.ts header; 'lands in the browser's type surface'"},
+        {"text": "repository.findDeliverable puts retry policy in persistence ring", "passed": false, "evidence": "MISSED — 'Not flagged' section clears the repository as a 'correct repository boundary'"},
+        {"text": "<=1 clearly-wrong extra", "passed": true, "evidence": "no incorrect findings (the policy issue is a false negative)"}
+      ],
+      "notes": ["Matches the skill run on both structural findings incl. the subtle port placement; misses only the policy-in-repository finding (anti-pattern 4)"]
+    },
+    {
+      "eval_id": 1, "eval_name": "webhooks-clean-adversarial", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 105.7, "tokens": 53572, "tool_calls": 11, "errors": 0 },
+      "expectations": [
+        {"text": "Concludes layering is sound", "passed": true, "evidence": "'The layering is sound ... No dependency-direction rule is broken'; reviewQueue framed as 'a design judgment, not a hard violation, and it is defensible'"},
+        {"text": "Does NOT flag getDelivery pass-through as anemic", "passed": true, "evidence": "not raised"},
+        {"text": "Does NOT flag platform/errors.ts import", "passed": true, "evidence": "not raised"},
+        {"text": "Does NOT flag secret: string ctor arg", "passed": true, "evidence": "'The secret arrives as a resolved string, consistent with SecretsProvider in the container'"},
+        {"text": "<=1 minor note, no invented ring violation", "passed": true, "evidence": "getPullDetail typecheck nit + reviewQueue soft ownership question + 2 nits"}
+      ],
+      "notes": ["Correctly calibrated the (real, unintended) reviewQueue cross-module write as a soft ownership question; resisted all 4 trap patterns"]
+    },
+    {
+      "eval_id": 1, "eval_name": "webhooks-clean-adversarial", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 0.8, "passed": 4, "failed": 1, "total": 5, "time_seconds": 98.4, "tokens": 48242, "tool_calls": 8, "errors": 0 },
+      "expectations": [
+        {"text": "Concludes layering is sound", "passed": false, "evidence": "'There is one real architecture violation' with a formal 'Summary of rules broken' table (rules 1-3) for the reviewQueue write"},
+        {"text": "Does NOT flag getDelivery pass-through as anemic", "passed": true, "evidence": "not raised"},
+        {"text": "Does NOT flag platform/errors.ts import", "passed": true, "evidence": "explicitly cleared as 'cross-layer'"},
+        {"text": "Does NOT flag secret: string ctor arg", "passed": true, "evidence": "treated as non-blocking wiring preference, 'not a layering break'"},
+        {"text": "<=1 minor note, no invented ring violation", "passed": true, "evidence": "reviewQueue finding is real (anti-pattern 7), though escalated to 3 numbered rules"}
+      ],
+      "notes": ["Same real finding as the skill run but overstated as a hard multi-rule violation rather than a calibrated ownership judgment"]
+    },
+    {
+      "eval_id": 2, "eval_name": "reviewer-core-calibrate-subtle", "configuration": "with_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 78.0, "tokens": 53170, "tool_calls": 11, "errors": 0 },
+      "expectations": [
+        {"text": "Flags Date.now() + Math.random() as purity/determinism (clock & RNG = outside world)", "passed": true, "evidence": "'clock is the outside world (decision-tree's own list)'"},
+        {"text": "Recommends now as a resolved param + deterministic ordering", "passed": true, "evidence": "'Add a now: number parameter'; 'take a seeded RNG as a param'"},
+        {"text": "Flags process.env.CALIBRATE_VERBOSE env read", "passed": true, "evidence": "item 1, anti-pattern 9 + rule 3"},
+        {"text": "Flags unconditional calibrationNote breaks byte-identical-prompt contract", "passed": true, "evidence": "item 6, 'optional slots not passed are not rendered is a stated contract'"},
+        {"text": "No wrong claims (server import / priorSeenAt); <=1 wrong extra", "passed": true, "evidence": "'Not flagged (correct): taking priorSeenAt as a resolved map'"}
+      ],
+      "notes": ["All 3 planted purity issues + correct type nits"]
+    },
+    {
+      "eval_id": 2, "eval_name": "reviewer-core-calibrate-subtle", "configuration": "without_skill", "run_number": 1,
+      "result": { "pass_rate": 1.0, "passed": 5, "failed": 0, "total": 5, "time_seconds": 77.0, "tokens": 45933, "tool_calls": 6, "errors": 0 },
+      "expectations": [
+        {"text": "Flags Date.now() + Math.random() as purity/determinism (clock & RNG = outside world)", "passed": true, "evidence": "'un-injected ambient clock, same impurity class as process.env'"},
+        {"text": "Recommends now as a resolved param + deterministic ordering", "passed": true, "evidence": "'should be a now: number parameter'; 'drop or inject the RNG'"},
+        {"text": "Flags process.env.CALIBRATE_VERBOSE env read", "passed": true, "evidence": "item 1"},
+        {"text": "Flags unconditional calibrationNote breaks byte-identical-prompt contract", "passed": true, "evidence": "item 5 'new slots are a governed contract' — found by reading reviewer-core/src/prompt.ts"},
+        {"text": "No wrong claims (server import / priorSeenAt); <=1 wrong extra", "passed": true, "evidence": "correct extras only"}
+      ],
+      "notes": ["Point-for-point match with the skill run; non-discriminating — domain purity is well-known and the prompt pointed it at prompt.ts"]
+    }
+  ],
+  "run_summary": {
+    "with_skill": {
+      "pass_rate": { "mean": 1.0, "stddev": 0.0, "min": 1.0, "max": 1.0 },
+      "time_seconds": { "mean": 97.4, "stddev": 13.8, "min": 78.0, "max": 108.6 },
+      "tokens": { "mean": 54422, "stddev": 1500, "min": 53170, "max": 56525 }
+    },
+    "without_skill": {
+      "pass_rate": { "mean": 0.867, "stddev": 0.094, "min": 0.8, "max": 1.0 },
+      "time_seconds": { "mean": 80.1, "stddev": 13.8, "min": 65.0, "max": 98.4 },
+      "tokens": { "mean": 49241, "stddev": 3190, "min": 45933, "max": 53549 }
+    },
+    "delta": { "pass_rate": "+0.13", "time_seconds": "+17.3", "tokens": "+5181" }
+  },
+  "notes": [
+    "Iteration 2 fixtures are harder and repo-specific, and the gap is now measurable: with_skill 15/15 (100%), without_skill 13/15 (87%). Both configs let the subagent read the real repo, which is the honest baseline for 'Claude working in this repo without the skill'.",
+    "Discriminating finding #1 (eval-0): only the skill run flagged that repository.findDeliverable bakes the retry-attempt cap into SQL — policy in the persistence ring (anti-pattern 4). The baseline explicitly cleared the repository as correct. This is the kind of finding the skill exists for.",
+    "Discriminating finding #2 (eval-1): given a module with one real-but-soft cross-module coupling, the skill run calibrated it as 'a design judgment, not a hard violation, defensible' (matching the skill's 'when a rule is genuinely in the way, say so' guidance), while the baseline escalated the same finding to a formal three-rule violation table and a 'changes requested'-style verdict.",
+    "Non-discriminating (eval-2): domain-purity / hermetic-test reasoning (clock, RNG, env as I/O) is well-known, and the repo-specific prompt-slot contract was catchable by reading reviewer-core/src/prompt.ts, which the baseline prompt invited. Both runs scored 5/5. To make this eval discriminate, remove the pointer to prompt.ts from the baseline and make the contract violation subtler (e.g. the slot is conditionally added but the condition is always true).",
+    "Fixture defect (eval-1): the 'clean' module was not fully clean — WebhooksRepository.enqueueReview writes another module's reviewQueue table (a real anti-pattern 7 coupling) and service.ts calls a non-existent port method getPullDetail. Both were unintended. The eval still works as a comparison (both configs saw the same fixture) but a true negative control fixture should be added in a future iteration.",
+    "Cost of the skill on these fixtures: +17s and +5.2k tokens per review (~+10%), now buying a real +13pp recall/precision gain rather than iteration 1's zero gain.",
+    "Variance caveat: single run per cell. The pass-rate gap rests on 2 assertion flips out of 15; a 3-run repeat would firm up whether +0.13 is stable."
+  ]
+}

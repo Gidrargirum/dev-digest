@@ -1,0 +1,11 @@
+{
+  "expectations": [
+    { "text": "Flags Date.now() clock read AND Math.random() jitter as domain-purity / determinism violations, treating clock and RNG as 'outside world'", "passed": true, "evidence": "Item 4: 'Date.now() — clock is the outside world (decision-tree's own list).' Item 3: 'Math.random() jitter — non-deterministic ... breaks hermetic unit tests and reproducible run traces.'" },
+    { "text": "Recommends passing now (and any randomness seed) as a resolved parameter and making ordering deterministic", "passed": true, "evidence": "'Add a now: number parameter'; 'Remove, or take a seeded RNG as a param.'" },
+    { "text": "Flags process.env.CALIBRATE_VERBOSE as an env access violating reviewer-core purity", "passed": true, "evidence": "Item 1: 'Reads process.env.CALIBRATE_VERBOSE — env read in the domain ring (anti-patterns #9, SKILL rule 3). Pass it in.'" },
+    { "text": "Flags unconditional calibrationNote addition as breaking the 'optional prompt slot not passed -> byte-identical prompt' contract; slot must be omitted when empty", "passed": true, "evidence": "Item 6: 'undeclared slot ... never rendered by assemblePrompt; \"optional slots not passed are not rendered\" is a stated contract. Either add the slot ... deliberately, or return the note as a plain value.'" },
+    { "text": "Does not claim it must import from server/ or that priorSeenAt param is a violation; <=1 wrong extra", "passed": true, "evidence": "'Not flagged (correct): taking priorSeenAt as a resolved map ...'. Extras (PromptParts import path, Finding.fingerprint vs id, console.error side effect) are all correct." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 78.0 }
+}

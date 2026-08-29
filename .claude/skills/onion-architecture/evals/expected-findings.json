@@ -1,0 +1,157 @@
+{
+  "skill": "onion-architecture",
+  "fixture": "fixtures/ — Widgets feature PR (mini-repo mirroring server/src/)",
+  "prompt": "Review this PR for Onion architecture / ring-boundary violations. The changed files are in evals/fixtures/: contracts/widgets.ts, adapters/llm/openai-tagger.ts, platform/container.ts (excerpt), platform/errors.ts (context only), and the feature module widgets/ (routes.ts, service.ts, repository.ts). For each problem: name the exact ring rule it breaks and say which file the fix goes in. Do not pad the list with speculative issues; if a file is fine, leave it alone.",
+
+  "findings": [
+    {
+      "id": "service-container-cycle",
+      "file": "widgets/service.ts",
+      "location": "constructor(private readonly container: Container) + platform/container.ts `new WidgetsService(this)`",
+      "rule": "SKILL rule 4 (one composition root) + anti-pattern 2",
+      "severity": "critical",
+      "must_name": [
+        "service takes the Container instead of the ports it uses (and reaches for `this.container.widgetTagger()` at call time — a service-locator lookup instead of an injected port)",
+        "the container also constructs it, so this is a real no-circular / dependency cycle (arch:check will fail), not just a testability smell",
+        "fix: a WidgetsDeps-style object of the specific ports (repo + WidgetTagger), assembled by the container — the repo-intel / blast / brief pattern"
+      ]
+    },
+    {
+      "id": "service-does-drizzle",
+      "file": "widgets/service.ts",
+      "location": "imports db/client + db/schema/widgets; db.insert(...).returning() in create(), db.select()...offset() in list()",
+      "rule": "SKILL rule 1 (direction) / stack-rules 'Drizzle stops at repository.ts' / service-not-in-db",
+      "severity": "critical",
+      "must_name": [
+        "the application ring runs Drizzle queries directly",
+        "the injected repository is bypassed for create/list (only get() uses it) — two data-access paths",
+        "fix: move the insert and the list query into WidgetsRepository methods; the service keeps only the decisions"
+      ]
+    },
+    {
+      "id": "routes-call-repository",
+      "file": "widgets/routes.ts",
+      "location": "imports WidgetsRepository; `new WidgetsRepository(container.db())`; `repo.countAll()` in the GET handler",
+      "rule": "SKILL rule 1 (direction) — 'routes.ts may not import repository.ts'",
+      "severity": "critical",
+      "must_name": [
+        "the entry ring talks to the repository directly, bypassing the service",
+        "fix: the service returns the list data (count included); routes never import or construct the repository"
+      ]
+    },
+    {
+      "id": "validate-in-handler",
+      "file": "widgets/routes.ts",
+      "location": "`body: z.unknown()` schema + `const body = CreateWidget.parse(req.body)` in the POST handler",
+      "rule": "stack-rules (Fastify) / anti-pattern 6 — validate with the route schema, not .parse() in the handler",
+      "severity": "major",
+      "must_name": [
+        "validation is done in the handler with .parse() instead of `schema.body`",
+        "fix: `schema: { body: CreateWidget }`; the handler receives an already-valid DTO"
+      ]
+    },
+    {
+      "id": "repository-returns-row-type",
+      "file": "widgets/repository.ts",
+      "location": "findById(): Promise<WidgetRow | undefined> and listStaleUntagged(): Promise<WidgetRow[]>; service.get() returns the row as Widget",
+      "rule": "stack-rules (Drizzle) / anti-pattern 3 — repository returns a domain type; row types stay in infrastructure",
+      "severity": "major",
+      "must_name": [
+        "the Drizzle row type (WidgetRow from db/rows.ts) escapes the repository and reaches the application ring",
+        "fix: map to the domain Widget inside the repository (move toWidget there)"
+      ]
+    },
+    {
+      "id": "policy-in-repository",
+      "file": "widgets/repository.ts",
+      "location": "listStaleUntagged() encodes the 'stale' rule (STALE_AFTER_DAYS cutoff + untagged) in the SQL where-clause",
+      "rule": "stack-rules (Drizzle) 'no business logic in a repository' / anti-pattern 4 / decision-tree 'business logic that needs the DB'",
+      "severity": "major",
+      "hard_to_catch": true,
+      "must_name": [
+        "'what counts as stale' is a business policy sitting in the persistence ring",
+        "fix: the decision lives in the service; the repository takes the cutoff as a parameter / runs the query it is told to"
+      ]
+    },
+    {
+      "id": "port-speaks-vendor",
+      "file": "contracts/widgets.ts",
+      "location": "WidgetTagger.suggest(payload: import('openai').OpenAI.Chat.ChatCompletionCreateParamsNonStreaming): Promise<string[]>",
+      "rule": "SKILL rule 2 (inversion) / anti-pattern 5 / contracts-depend-on-nothing",
+      "severity": "critical",
+      "must_name": [
+        "the port imports an `openai` SDK type into the innermost ring and speaks the vendor's vocabulary — a wrapper, not a port",
+        "fix: a domain-named port (e.g. `suggest(name: string): Promise<string[]>` or a small domain input); the OpenAI types stay inside the adapter"
+      ]
+    },
+    {
+      "id": "port-in-vendor-shared",
+      "file": "contracts/widgets.ts",
+      "location": "WidgetTagger interface appended to vendor/shared (contracts/widgets.ts)",
+      "rule": "SKILL rule 2 — a port the client has no use for goes in server/src/ports/",
+      "severity": "major",
+      "must_name": [
+        "widget tagging is server-only; the browser bundle never tags a widget, so the port must not land in the vendored `vendor/shared` type surface",
+        "fix: put the port in server/src/ports/ (same innermost ring, not vendored) — the Widget / CreateWidget contracts legitimately stay in vendor/shared"
+      ]
+    },
+    {
+      "id": "contract-carries-transport-envelope",
+      "file": "contracts/widgets.ts",
+      "location": "WidgetsPage = { items, page, pageSize, total, nextCursor }",
+      "rule": "stack-rules (Zod) — a contract schema describes the domain shape, not a transport envelope; pagination/HTTP framing stays in routes.ts",
+      "severity": "minor",
+      "must_name": [
+        "the pagination envelope (page/pageSize/total/nextCursor) is baked into a domain contract",
+        "fix: the contract is the domain list; routes.ts wraps the transport envelope (assembling it in the handler is fine)"
+      ]
+    },
+    {
+      "id": "adapter-reads-env-secret",
+      "file": "adapters/llm/openai-tagger.ts",
+      "location": "constructor: `new OpenAI({ apiKey: process.env.OPENAI_API_KEY })`",
+      "rule": "stack-rules (DI container) / repo secrets convention — adapters are constructed lazily and resolved through SecretsProvider; secrets never read from env/AppConfig/DB in adapter code",
+      "severity": "major",
+      "must_name": [
+        "the adapter reaches into process.env for its key instead of receiving it",
+        "fix: take the key (or a configured client) as a constructor argument; platform/container.ts resolves it via SecretsProvider when it lazily builds the adapter"
+      ]
+    }
+  ],
+
+  "minor_notes_ok": [
+    "platform/container.ts reads this.overrides.widgets but ContainerOverrides only declares widgetTagger? — the `widgets?` field is missing (untestable by substitution).",
+    "widgetsRoutes constructs `new WidgetsService(container)` in the route file rather than the container (same debt as the repo's own repos/agents/reviews modules)."
+  ],
+
+  "must_not_flag": [
+    {
+      "what": "widgets/service.ts importing { NotFoundError } from '../../platform/errors.js'",
+      "why": "platform/errors.ts is usable from any ring — this is explicitly allowed."
+    },
+    {
+      "what": "widgets/service.ts `get(id)` being a thin pass-through to repo.findById + a NotFoundError guard",
+      "why": "a genuine read-through is not an 'anemic ring' violation (anti-pattern 1)."
+    },
+    {
+      "what": "widgets/repository.ts importing drizzle-orm, db/client (Db), db/schema/widgets",
+      "why": "correct for the infrastructure ring — Drizzle belongs exactly here."
+    },
+    {
+      "what": "widgets/routes.ts importing fastify / ZodTypeProvider and building the pagination envelope in the handler",
+      "why": "Fastify types belong in routes.ts; assembling the transport envelope in the handler is the right place (the contract carrying it is the violation, not this)."
+    },
+    {
+      "what": "adapters/llm/openai-tagger.ts importing the `openai` SDK and using OpenAI.* types in its own signatures",
+      "why": "the SDK is correctly contained to the adapter file; the leak is the *port* naming those types, not the adapter using them."
+    }
+  ],
+
+  "grading": {
+    "total_findings": 10,
+    "pass_rate": "caught / 10",
+    "precision_gate": "at most one clearly-wrong extra finding; any must_not_flag hit is a false positive",
+    "known_discriminator": "policy-in-repository is the finding unaided Claude reliably misses even with full repo access; the Container-injection cycle is a close second (baseline tends to endorse a `new XRepository(container.db)` variant instead of flagging it)",
+    "validation_run": "onion-architecture-workspace/iteration-4/ — with_skill 9/10, without_skill 6.5/10 (Δ +0.25), 0 false positives either side"
+  }
+}

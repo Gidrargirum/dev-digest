@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Evals for the DevDigest Claude Code harness (skills + subagents + workflow). vitest + Claude Agent SDK, on the Claude Code subscription — no API token, no external services.",
+  "description": "Evals for the DevDigest Claude Code harness (skills + subagents + workflow), locally or through OpenRouter CI.",
   "scripts": {
     "eval": "vitest run",
     "eval:skills": "vitest run skills",
@@ -15,6 +15,7 @@
     "eval:delta": "tsx src/delta.ts",
     "eval:benchmark": "tsx src/records/benchmark.ts",
     "eval:scaffold": "tsx src/scaffold.ts",
+    "test:ci": "node --test scripts/ci-detect.test.mjs && vitest run --exclude '**/*.eval.ts'",
     "proxy:up": "scripts/litellm-proxy.sh up",
     "proxy:down": "scripts/litellm-proxy.sh down",
     "proxy:wait": "scripts/litellm-proxy.sh wait",

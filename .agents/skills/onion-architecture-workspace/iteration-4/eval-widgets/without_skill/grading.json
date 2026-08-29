@@ -1,0 +1,20 @@
+{
+  "config": "without_skill",
+  "findings": [
+    { "id": "service-container-cycle", "caught": false, "score": 0, "evidence": "MISSED. §4 flags `new WidgetsService(container)` in routes as 'bypasses the composition root, use container.widgets'; §6 says 'the DI seam is bypassed'. Never flags `constructor(container: Container)` as pointing the application ring outward, nor the no-circular cycle. Worse, §6 recommends the `this.repo = new ConventionsRepository(container.db)` pattern — a Container-injection variant" },
+    { "id": "service-does-drizzle", "caught": true, "score": 1, "evidence": "§6: quotes the drizzle-orm / db / db/schema imports and inline insert/select; 'application ring may not depend on infrastructure'" },
+    { "id": "service-locator-tagger", "caught": false, "score": 0, "evidence": "MISSED. `this.container.widgetTagger()` never mentioned" },
+    { "id": "routes-call-repository", "caught": true, "score": 1, "evidence": "§5: quotes the WidgetsRepository import + `repo.countAll()` in the handler; 'the route must not reach into repository.ts'" },
+    { "id": "validate-in-handler", "caught": true, "score": 1, "evidence": "§8: `z.unknown()` + `.parse()` in the handler; fix = `schema: { body: CreateWidget }`" },
+    { "id": "repository-returns-row-type", "caught": false, "score": 0.5, "evidence": "§7 catches the symptom (get() returns an unmapped WidgetRow) but attributes it to the service ('return toWidget(widget) in service.ts') and explicitly clears the repository in 'Files that are fine' ('returns WidgetRow ... Leave as is') — the opposite of the skill's rule that the repository returns domain types" },
+    { "id": "policy-in-repository", "caught": false, "score": 0, "evidence": "MISSED. 'Files that are fine: widgets/repository.ts — correct infrastructure ring ... Leave as is.' The listStaleUntagged staleness policy in SQL is never mentioned" },
+    { "id": "port-speaks-vendor", "caught": true, "score": 1, "evidence": "§1: quotes the `import('openai')` type; 'the contracts ring must not depend on any adapter/vendor library'; fix = provider-neutral input" },
+    { "id": "port-in-vendor-shared", "caught": true, "score": 1, "evidence": "§1: 'consider whether this port belongs in server/src/ports/ instead of vendor/shared — the client has no notion of widget-tag suggestion'" },
+    { "id": "contract-carries-transport-envelope", "caught": false, "score": 0, "evidence": "MISSED. §5 notes routes 'assembles the WidgetsPage envelope itself' but never flags that WidgetsPage living in the contract is wrong; recommends a `service.listPage(): Promise<WidgetsPage>` which keeps the envelope in the contract" },
+    { "id": "adapter-reads-env-secret", "caught": true, "score": 1, "evidence": "§2 + §3: quotes `process.env.OPENAI_API_KEY`; also flags the sync `widgetTagger()` accessor that forced the env read; fix = `constructor(apiKey: string)` + async container accessor via this.secrets" }
+  ],
+  "false_positives": [],
+  "must_not_flag_check": "PASS — repository.ts and errors.ts explicitly cleared; no clean pattern flagged (though clearing repository.ts also means missing 2 real findings in it)",
+  "extra_findings": ["file-name collision note (openai.ts vs openai-tagger.ts) — a fair observation about the fixture, not a false positive", "x-workspace-id raw header read vs getContext(req) — minor, correct"],
+  "summary": { "caught": 6.5, "total": 11, "pass_rate": 0.591, "false_positives": 0 }
+}

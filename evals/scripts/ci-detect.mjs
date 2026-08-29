@@ -1,88 +1,152 @@
-/**
- * CI change detector for the harness evals.
- *
- * Reads a newline-separated list of changed files (repo-relative) from $CHANGED_FILES and maps
- * them onto the eval suites that should run for this PR:
- *
- *   .claude/skills/<name>/**   OR  evals/skills/<name>/**   → run evals/skills/<name>  (content tier)
- *   .claude/agents/<name>.md   OR  evals/agents/<name>/**   → run evals/agents/<name>  (tool tier)
- *   CLAUDE.md / .claude/CLAUDE.md / any agent / engine change → run the workflow tier
- *
- * A changed artifact with NO written evals is NOT a failure: it is reported on the `skipped_*`
- * outputs so the job can print a visible "SKIP <name> (no evals)" line instead of going red.
- *
- * Emits GitHub Actions step outputs (skills, agents, run_workflow, skipped_skills, skipped_agents)
- * to $GITHUB_OUTPUT. Pure filesystem + string work — no deps.
- */
+/** PR-aware change detector for the model-backed harness evals. */
 
-import { existsSync, readdirSync, appendFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { appendFileSync, existsSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const EVALS_DIR = join(dirname(fileURLToPath(import.meta.url)), "..");
 const REPO_ROOT = join(EVALS_DIR, "..");
+const SAFE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
-const changed = (process.env.CHANGED_FILES ?? "")
-  .split("\n")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-/** Does evals/<tier>/<name>/ contain at least one *.eval.ts? */
-function hasEvals(tier, name) {
-  const dir = join(EVALS_DIR, tier, name);
-  if (!existsSync(dir)) return false;
-  return readdirSync(dir).some((f) => f.endsWith(".eval.ts"));
+function hasEvals(root, tier, name) {
+  const dir = join(root, "evals", tier, name);
+  return existsSync(dir) && readdirSync(dir).some((file) => file.endsWith(".eval.ts"));
 }
 
-/** Collect distinct artifact names touched under a `.claude` and/or `evals` prefix. */
-function touched(reClaude, reEvals) {
+function directoriesWithEvals(root, tier) {
+  const dir = join(root, "evals", tier);
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .filter((name) => hasEvals(root, tier, name))
+    .sort();
+}
+
+function hasArtifact(root, tier, name) {
+  return tier === "skills"
+    ? existsSync(join(root, ".claude", "skills", name, "SKILL.md"))
+    : existsSync(join(root, ".claude", "agents", `${name}.md`));
+}
+
+function namesTouched(changed, artifactPattern, evalPattern) {
   const names = new Set();
-  for (const f of changed) {
-    const m = f.match(reClaude) ?? f.match(reEvals);
-    if (m) names.add(m[1]);
+  for (const file of changed) {
+    const match = file.match(artifactPattern) ?? file.match(evalPattern);
+    if (match) names.add(match[1]);
   }
   return [...names].sort();
 }
 
-const skillNames = touched(
-  /^\.claude\/skills\/([^/]+)\//,
-  /^evals\/skills\/([^/]+)\//,
-);
-const agentNames = touched(
-  /^\.claude\/agents\/([^/]+)\.md$/,
-  /^evals\/agents\/([^/]+)\//,
-);
+export function detect(changed, root = REPO_ROOT, { forceScope } = {}) {
+  const fullRun =
+    forceScope === "all" ||
+    changed.some(
+    (file) =>
+      /^evals\/(?:src|scripts|proxy)\//.test(file) ||
+      /^evals\/(?:package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|tsconfig\.json|vitest\.config\.ts)$/.test(file) ||
+      file === ".github/workflows/evals.yml",
+    );
+  const touchedSkills = namesTouched(
+    changed,
+    /^\.claude\/skills\/([^/]+)\//,
+    /^evals\/skills\/([^/]+)\//,
+  );
+  const touchedAgents = namesTouched(
+    changed,
+    /^\.claude\/agents\/(?!README\.md$)([^/]+)\.md$/,
+    /^evals\/agents\/([^/]+)\//,
+  );
+  const candidateSkills = fullRun ? directoriesWithEvals(root, "skills") : touchedSkills;
+  const candidateAgents = fullRun ? directoriesWithEvals(root, "agents") : touchedAgents;
+  const skills = candidateSkills.filter((name) =>
+    SAFE_NAME.test(name) && hasEvals(root, "skills", name) && hasArtifact(root, "skills", name),
+  );
+  const agents = candidateAgents.filter((name) =>
+    SAFE_NAME.test(name) && hasEvals(root, "agents", name) && hasArtifact(root, "agents", name),
+  );
+  const skippedSkills = touchedSkills.filter((name) => !hasEvals(root, "skills", name));
+  const skippedAgents = touchedAgents.filter((name) => !hasEvals(root, "agents", name));
+  const integrityCandidates = fullRun
+    ? { skills: directoriesWithEvals(root, "skills"), agents: directoriesWithEvals(root, "agents") }
+    : { skills: touchedSkills.filter((name) => hasEvals(root, "skills", name)), agents: touchedAgents.filter((name) => hasEvals(root, "agents", name)) };
+  const integrityErrors = [
+    ...integrityCandidates.skills
+      .filter((name) => !SAFE_NAME.test(name) || !hasArtifact(root, "skills", name))
+      .map((name) => `skill/${name}: missing .claude/skills/${name}/SKILL.md`),
+    ...integrityCandidates.agents
+      .filter((name) => !SAFE_NAME.test(name) || !hasArtifact(root, "agents", name))
+      .map((name) => `agent/${name}: missing .claude/agents/${name}.md`),
+  ];
+  const instructionsChanged = changed.some((file) => /(^|\/)(?:AGENTS|CLAUDE)\.md$/.test(file));
+  const agentArtifactChanged = changed.some((file) => /^\.claude\/agents\/(?!README\.md$)[^/]+\.md$/.test(file));
+  const harnessConfigChanged = changed.some((file) =>
+    /^\.claude\/(?:settings[^/]*\.json|hooks\/|commands\/)/.test(file),
+  );
+  const workflowChanged = changed.some((file) => /^evals\/workflow\//.test(file));
+  const runWorkflow =
+    forceScope === "workflow" || fullRun || instructionsChanged || agentArtifactChanged || harnessConfigChanged || workflowChanged;
+  const matrix = {
+    include: [
+      ...skills.map((name) => ({ tier: "skill", name, path: `skills/${name}` })),
+      ...agents.map((name) => ({ tier: "agent", name, path: `agents/${name}` })),
+      ...(runWorkflow ? [{ tier: "workflow", name: "general", path: "workflow" }] : []),
+    ],
+  };
 
-const skills = skillNames.filter((n) => hasEvals("skills", n));
-const skippedSkills = skillNames.filter((n) => !hasEvals("skills", n));
-const agents = agentNames.filter((n) => hasEvals("agents", n));
-const skippedAgents = agentNames.filter((n) => !hasEvals("agents", n));
+  return {
+    matrix,
+    skills,
+    agents,
+    runWorkflow,
+    skippedSkills,
+    skippedAgents,
+    integrityErrors,
+    fullRun,
+    hasWork: skills.length > 0 || agents.length > 0 || runWorkflow,
+  };
+}
 
-// The workflow tier measures the LIVE harness, so anything that changes it re-triggers it:
-// the root or .claude CLAUDE.md, any agent definition, the workflow cases, or the engine itself.
-const runWorkflow = changed.some(
-  (f) =>
-    f === "CLAUDE.md" ||
-    f === ".claude/CLAUDE.md" ||
-    /^\.claude\/agents\/.+\.md$/.test(f) ||
-    /^evals\/workflow\//.test(f) ||
-    /^evals\/src\//.test(f),
-);
+export function formatSummary(result, changedCount) {
+  const lines = [
+    "## Harness eval selection",
+    "",
+    `Changed files: ${changedCount}`,
+    `- Skills: ${result.skills.join(", ") || "none"}`,
+    `- Agents: ${result.agents.join(", ") || "none"}`,
+    `- General workflow: ${result.runWorkflow ? "run" : "skip"}`,
+  ];
+  for (const name of result.skippedSkills) lines.push(`- SKIP skill/${name}: no matching *.eval.ts`);
+  for (const name of result.skippedAgents) lines.push(`- SKIP agent/${name}: no matching *.eval.ts`);
+  lines.push(`- Matrix: ${result.matrix.include.map((suite) => `${suite.tier}/${suite.name}`).join(", ") || "empty"}`);
+  for (const problem of result.integrityErrors) lines.push(`- ERROR invalid eval ${problem}`);
+  return `${lines.join("\n")}\n`;
+}
 
-const out = process.env.GITHUB_OUTPUT;
-const write = (k, v) => (out ? appendFileSync(out, `${k}=${v}\n`) : console.log(`${k}=${v}`));
+function writeOutput(key, value) {
+  const output = process.env.GITHUB_OUTPUT;
+  if (output) appendFileSync(output, `${key}=${value}\n`);
+  else console.log(`${key}=${value}`);
+}
 
-write("skills", JSON.stringify(skills));
-write("agents", JSON.stringify(agents));
-write("run_workflow", String(runWorkflow));
-write("skipped_skills", skippedSkills.join(" "));
-write("skipped_agents", skippedAgents.join(" "));
+function main() {
+  const changed = (process.env.CHANGED_FILES ?? "")
+    .split("\n")
+    .map((file) => file.trim())
+    .filter(Boolean);
+  const forceScope = process.env.FORCE_SCOPE || undefined;
+  const result = detect(changed, REPO_ROOT, { forceScope });
+  writeOutput("matrix", JSON.stringify(result.matrix));
+  writeOutput("skills", JSON.stringify(result.skills));
+  writeOutput("agents", JSON.stringify(result.agents));
+  writeOutput("run_workflow", String(result.runWorkflow));
+  writeOutput("has_work", String(result.hasWork));
+  writeOutput("skipped_skills", JSON.stringify(result.skippedSkills));
+  writeOutput("skipped_agents", JSON.stringify(result.skippedAgents));
+  writeOutput("integrity_errors", JSON.stringify(result.integrityErrors));
+  const summary = formatSummary(result, changed.length);
+  process.stderr.write(summary);
+  if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, summary);
+}
 
-// Human-readable summary in the step log.
-console.error("── eval change detection ──");
-console.error(`changed files : ${changed.length}`);
-console.error(`skills → run  : ${skills.join(", ") || "(none)"}`);
-console.error(`agents → run  : ${agents.join(", ") || "(none)"}`);
-console.error(`workflow tier : ${runWorkflow ? "run" : "skip"}`);
-if (skippedSkills.length) console.error(`SKIP skills (no evals): ${skippedSkills.join(", ")}`);
-if (skippedAgents.length) console.error(`SKIP agents (no evals): ${skippedAgents.join(", ")}`);
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();

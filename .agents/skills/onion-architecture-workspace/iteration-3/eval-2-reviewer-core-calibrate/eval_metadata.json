@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "reviewer-core-calibrate",
+  "prompt": "Review `evals/fixtures/reviewer-core-calibrate/calibrate.ts`, a new file proposed for `reviewer-core/src/review/`. It takes all of its data through parameters \u2014 no `fs`, no `fetch`, no import from `server/`, and it typechecks. Is it acceptable in the domain ring as written? Flag every rule it breaks and how to fix it.",
+  "assertions": [
+    "Flags the `Date.now()` / recency-decay clock read AND the `Math.random()` jitter as domain-purity / determinism violations \u2014 explicitly treating the clock and RNG as 'outside world', not just as a code-style preference",
+    "Recommends passing `now` (and any needed randomness seed) in as a resolved parameter and making the ordering deterministic, rather than reading the clock inside the function",
+    "Flags the `process.env.CALIBRATE_DEBUG` read as an env access that violates reviewer-core purity (breaks hermetic no-env tests)",
+    "Flags that `calibrate.ts` effectively always adds `calibrationNote` to the prompt (the `findings.length > 0` guard is always true when the function runs), breaking the 'optional prompt slot not passed \u2192 prompt byte-identical / no behaviour change' contract, and recommends returning the note as a plain value or declaring the slot deliberately",
+    "Does not incorrectly claim the file must import from `server/`, or that taking `priorSeenAt` as a parameter is itself a violation, and raises no more than one clearly-wrong extra finding"
+  ]
+}

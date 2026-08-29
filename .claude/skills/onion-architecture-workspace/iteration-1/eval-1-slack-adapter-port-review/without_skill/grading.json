@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags that the SlackClient port leaks the vendor SDK: it imports @slack/web-api types into vendor/shared and its method signatures are in Slack's vocabulary rather than domain terms", "passed": true, "evidence": "Finding 1 'The port is defined in terms of the Slack SDK's own types' + Finding 7 on the return path; recommends a domain-owned ReviewNotifier with own DTOs." },
+    { "text": "Flags that ReviewsService instantiates `new SlackWebApiClient()` directly instead of depending on the SlackClient interface injected via the container", "passed": true, "evidence": "Finding 4 'ReviewsService instantiates the concrete adapter directly': names the import and `new SlackWebApiClient()`, cites the inward dependency rule and composition root; recommends constructor injection + DI binding." },
+    { "text": "Flags that the adapter reads the token from process.env instead of SecretsProvider (and/or constructs the client eagerly instead of lazily)", "passed": true, "evidence": "Finding 5 'The adapter self-configures from process.env': quotes `new WebClient(process.env.SLACK_BOT_TOKEN)`, references SecretsProvider / ~/.devdigest/secrets.json." },
+    { "text": "Recommends defining the port in domain vocabulary and wiring the adapter through platform/container.ts + ContainerOverrides", "passed": true, "evidence": "Summary of required changes items 1 and 4: domain-owned ReviewNotifier port; wire SlackWebApiClient -> ReviewNotifier in the DI container with token via SecretsProvider. (Does not mention ContainerOverrides by name.)" },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "Extras (port mirrors adapter API, wrong ring for vendor/shared, REVIEW_CHANNEL_ID in module, vendor objects in return types) are all defensible; none clearly wrong." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 59.3 },
+  "notes": ["Baseline catches all three planted issues and the port-placement problem, but from general PP knowledge; does not name ContainerOverrides or the browser-bundle reason vendor/shared specifically hurts here. 7 findings, more verbose."]
+}

@@ -1,0 +1,15 @@
+{
+  "config": "skill-OLD (no §11, no §12, no Module-ownership section)",
+  "findings": [
+    { "id": "cross-module-type-import", "type": "DISCRIMINATOR", "caught": true, "score": 0.75,
+      "evidence": "M2: 'service.ts imports the ReviewRunSummary type from ../reviews/types.js — cross-module type coupling (anti-pattern #7); the injected recentRuns port is correct, only the type should be local/_shared.' Right finding + right fix + correctly did NOT flag the injection. Framed as §7; did not name the §12-specific point (import type compiles away, dependency-cruiser skips it, arch:check stays green)." },
+    { "id": "cross-module-data-reachin", "type": "DISCRIMINATOR (prev round)", "caught": true, "score": 0.75,
+      "evidence": "C2 + C3: flags the redeclared notification_outbox and queueNotification writing it; fix = drop the method, enqueue via an injected notifications port wired in the container. Framed as §7 + 'duplicate pgTable hazard'; no 'one module, one aggregate' framing." },
+    { "id": "cross-module-value-import", "type": "CONTROL", "caught": true, "score": 1, "evidence": "M1: NOTIFICATION_KINDS from ../notifications/constants.js, anti-pattern #7" },
+    { "id": "service-does-drizzle", "type": "CONTROL", "caught": true, "score": 1, "evidence": "C1: db/client + db/schema imports, inline pagination query in list(); rule 1 + service-not-in-db + anti-pattern #3" },
+    { "id": "policy-in-repository", "type": "CONTROL", "caught": true, "score": 1, "evidence": "M3: MAX_CONSECUTIVE_FAILURES in findDue where-clause; decision-tree 'decision in the service'. Marked 'lower confidence'." }
+  ],
+  "false_positives": [],
+  "must_not_flag_check": "PASS — 'Fine, untouched' clears DigestDeps inversion, the recentRuns injection, Db constructor injection, the domain-type mapping",
+  "summary": { "caught": 4.5, "total": 5, "pass_rate": 0.90, "false_positives": 0 }
+}

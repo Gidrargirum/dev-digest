@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags that the SlackClient port leaks the vendor SDK: it imports @slack/web-api types into vendor/shared and its method signatures are in Slack's vocabulary rather than domain terms", "passed": true, "evidence": "Finding 1 (CRITICAL) 'SlackClient is a wrapper, not a port': names the @slack/web-api type imports and the 1:1 SDK method mapping; cites rule 2 + anti-pattern 5 and the decision-tree 'if the interface mentions the vendor it is not a port' line." },
+    { "text": "Flags that ReviewsService instantiates `new SlackWebApiClient()` directly instead of depending on the SlackClient interface injected via the container", "passed": true, "evidence": "Finding 3 (CRITICAL): quotes the adapters/slack import and `new SlackWebApiClient()`; cites the service.ts -> adapters ban and rule 4; recommends constructor injection of the port." },
+    { "text": "Flags that the adapter reads the token from process.env instead of SecretsProvider (and/or constructs the client eagerly instead of lazily)", "passed": true, "evidence": "Finding 5 (MEDIUM): quotes `new WebClient(process.env.SLACK_BOT_TOKEN)`; cites stack-rules 'adapters constructed lazily and resolved through SecretsProvider'." },
+    { "text": "Recommends defining the port in domain vocabulary and wiring the adapter through platform/container.ts + ContainerOverrides", "passed": true, "evidence": "Finding 1 fix gives a domain-named ReviewNotifier interface; Finding 4 (HIGH) is specifically 'No composition-root wiring, no ContainerOverrides entry' with the fix to construct lazily in container.ts and add a notifier field to ContainerOverrides." },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "The one extra (Finding 2: port belongs in server/src/ports/ not vendor/shared because it is browser-bundled) is correct and repo-specific. 'What is fine' section included." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 55.4 },
+  "notes": ["Skill run uniquely nails the vendor/shared vs src/ports/ distinction with the browser-bundle rationale, and ties findings to the anti-patterns review checklist (ContainerOverrides)."]
+}

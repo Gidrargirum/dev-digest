@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags the node:fs readFileSync call (reading severity-rubric.json at import time) as I/O that must not happen in reviewer-core", "passed": true, "evidence": "Violation 3: quotes the readFileSync line, cites rule 3 + anti-pattern 9 'just reading a config file once at import', also notes __dirname is broken in ESM." },
+    { "text": "Flags the import of RepoIntelRepository from server/src/modules as an inward ring depending on an outer ring (wrong direction)", "passed": true, "evidence": "Violation 1: quotes the `../../server/src/modules/repo-intel/repository.js` import, cites rule 1 and the decision-tree import table (reviewer-core -> repository = ✗), notes the server->reviewer-core->server cycle failing arch:check." },
+    { "text": "Flags the fetch() call to the GitHub API as I/O that violates domain purity", "passed": true, "evidence": "Violation 4: quotes the fetch to api.github.com, cites rule 3 ('diff -> prompt -> LLM -> findings; only side effect is the injected LLMProvider'); says it belongs behind the GitHubClient port." },
+    { "text": "Recommends moving data resolution to the caller and passing resolved values through ReviewInput (not identifiers)", "passed": true, "evidence": "Violation 6 quotes rule 3 'Inputs are resolved strings, not identifiers'; the restructure section gives a pure sync enrichSeverity(findings, {hotFiles, changedFileCount}) with a server-side service resolving inputs and optional ReviewInput slots." },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "Extras (violation 2: new concrete class + cross-module reach-in past the service; violation 5: process.env secret) are both real and grounded. No clearly-wrong finding." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 66.7 },
+  "notes": ["Skill run adds the cross-module reach-in nuance (even inside server/, go through the service not the repository) and gives a concrete rubric-as-TS-literal-module fix."]
+}

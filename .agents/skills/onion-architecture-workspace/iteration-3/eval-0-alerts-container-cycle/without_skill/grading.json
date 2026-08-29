@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "Finding 1: 'forms a concrete import cycle: container.ts imports AlertsService, service.ts imports Container ... arch:check flags modules/** -> platform/**'",
+      "passed": true,
+      "evidence": "Finding 1: 'forms a concrete import cycle: container.ts imports AlertsService, service.ts imports Container ... arch:check flags modules/** -> platform/**'"
+    },
+    {
+      "text": "Finding 1 fix: modules/alerts/types.ts AlertsDeps { sink }; container new AlertsService({ sink: () => this.alertSink() }, ...)",
+      "passed": true,
+      "evidence": "Finding 1 fix: modules/alerts/types.ts AlertsDeps { sink }; container new AlertsService({ sink: () => this.alertSink() }, ...)"
+    },
+    {
+      "text": "Finding 2: AlertSink -> server/src/ports/ not vendor/shared; quotes ports/index.ts test; same case as Tokenizer/DepGraph",
+      "passed": true,
+      "evidence": "Finding 2: AlertSink -> server/src/ports/ not vendor/shared; quotes ports/index.ts test; same case as Tokenizer/DepGraph"
+    },
+    {
+      "text": "MISSED. 'Not flagged' clears repository.ts as 'correct for a module persistence adapter'; the MAX_DELIVERY_ATTEMPTS retry-cap policy in the where-clause is never mentioned",
+      "passed": false,
+      "evidence": "MISSED. 'Not flagged' clears repository.ts as 'correct for a module persistence adapter'; the MAX_DELIVERY_ATTEMPTS retry-cap policy in the where-clause is never mentioned"
+    },
+    {
+      "text": "Finding 3 (concrete AlertsRepository) explicitly hedged as 'a soft finding, not an arch:check failure' - not a clearly-wrong claim",
+      "passed": true,
+      "evidence": "Finding 3 (concrete AlertsRepository) explicitly hedged as 'a soft finding, not an arch:check failure' - not a clearly-wrong claim"
+    }
+  ],
+  "summary": {
+    "passed": 4,
+    "failed": 1,
+    "total": 5,
+    "pass_rate": 0.8
+  }
+}
