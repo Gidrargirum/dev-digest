@@ -20,13 +20,14 @@ const TRACE: RunTrace = {
 };
 
 vi.mock("@/lib/hooks/trace", () => ({
-  useRunTrace: () => ({ data: TRACE, isLoading: false }),
+  useRunTrace: vi.fn(() => ({ data: TRACE, isLoading: false })),
 }));
 vi.mock("@/lib/hooks/reviews", () => ({
   useRunEvents: () => ({ events: [], running: false }),
 }));
 
 import RunTraceDrawer from "./RunTraceDrawer";
+import { useRunTrace } from "@/lib/hooks/trace";
 
 afterEach(cleanup);
 
@@ -53,5 +54,39 @@ describe("A5 Run Trace drawer (smoke)", () => {
     fireEvent.click(screen.getByText("log"));
     // LiveLogStream renders its filter input
     expect(screen.getByPlaceholderText("Filter log…")).toBeInTheDocument();
+  });
+
+  it("shows per-document Specs read entries and the full untrusted specs block on expand", () => {
+    const SPECS_TEXT =
+      "--- .devdigest/specs/rate-limits.md ---\nAll public endpoints must be rate-limited.\n--- end ---";
+    vi.mocked(useRunTrace).mockReturnValueOnce({
+      data: {
+        ...TRACE,
+        specs_read: [
+          ".devdigest/specs/rate-limits.md · ≈120 tokens",
+          ".devdigest/docs/auth.md · ≈340 tokens",
+        ],
+        prompt_assembly: { ...TRACE.prompt_assembly, specs: SPECS_TEXT },
+      },
+      isLoading: false,
+    } as ReturnType<typeof useRunTrace>);
+
+    renderWithIntl(<RunTraceDrawer runId="r1" agentName="Security" prNumber={482} onClose={() => {}} />);
+
+    // AC-19: each attached document appears with its own path and token estimate.
+    expect(screen.getByText(".devdigest/specs/rate-limits.md · ≈120 tokens")).toBeInTheDocument();
+    expect(screen.getByText(".devdigest/docs/auth.md · ≈340 tokens")).toBeInTheDocument();
+
+    // The Prompt assembly section is collapsed by default — open it first.
+    fireEvent.click(screen.getByText("Prompt assembly"));
+
+    // AC-20: expanding "Project context — attached specs (untrusted)" shows the
+    // exact block text, delimiters included, with no truncation. Match on the
+    // raw textContent (a normalizer bypass) since the block is multi-line.
+    const exactSpecsText = (_content: string, node: Element | null) => node?.textContent === SPECS_TEXT;
+    const specsLabel = screen.getByText("Project context — attached specs (untrusted)");
+    expect(screen.queryByText(exactSpecsText)).not.toBeInTheDocument();
+    fireEvent.click(specsLabel);
+    expect(screen.getByText(exactSpecsText)).toBeInTheDocument();
   });
 });

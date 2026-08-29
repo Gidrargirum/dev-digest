@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags that service.ts performs database access directly (imports db/client and db/schema, builds Drizzle queries) instead of delegating to the repository", "passed": true, "evidence": "Finding 1 (CRITICAL): quotes the db/client + db/schema imports and the db.select/db.insert calls; cites 'Drizzle stops at repository.ts' and the import-legality table row service.ts -> db = ✗." },
+    { "text": "Flags that NotificationsService takes `Container` as a constructor parameter instead of the specific ports it needs", "passed": true, "evidence": "Finding 2 (CRITICAL): quotes `constructor(private readonly container: Container)` and `this.container.github()`, cites rule 4 / anti-pattern 2, recommends naming repo + GitHubClient ports." },
+    { "text": "Flags that routes.ts imports and calls NotificationsRepository directly, bypassing the service layer", "passed": true, "evidence": "Finding 3 (CRITICAL): quotes the repository import and `new NotificationsRepository(...)` + `repo.findById/markRead` in the handler; cites 'routes.ts may not import repository.ts'." },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "Extra findings 4-7 (handler branching/status code, repo returns row types, pagination envelope in service, two data paths) are all defensible and grounded in stack-rules; none is clearly wrong. A 'Not flagged (fine)' section is included." },
+    { "text": "For each real finding, names the correct fix (move persistence into the repository; inject ports; route through the service)", "passed": true, "evidence": "Each finding has a Fix subsection: move queries into repository methods; constructor takes repo + GitHubClient with ContainerOverrides entry; handler becomes `await service.markRead(id); reply.code(204)`." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 65.9 },
+  "notes": ["Skill run cites specific rule numbers, the import-legality table, and anti-pattern numbers; prioritises 3 CRITICAL + 4 lesser and adds an explicit 'checked, fine' section."]
+}

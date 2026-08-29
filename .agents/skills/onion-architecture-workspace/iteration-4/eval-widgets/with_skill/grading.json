@@ -1,0 +1,20 @@
+{
+  "config": "with_skill",
+  "findings": [
+    { "id": "service-container-cycle", "caught": true, "score": 1, "evidence": "C3: names the Container-in-constructor + `new WidgetsService(this)` as a no-circular cycle (Rule 4 / anti-pattern 2); fix = constructor takes repo + WidgetTagger ports, container assembles" },
+    { "id": "service-does-drizzle", "caught": true, "score": 1, "evidence": "C2: quotes the db/client + db/schema imports and the inline insert/select; cites 'Drizzle stops at repository.ts' / service-not-in-db" },
+    { "id": "service-locator-tagger", "caught": false, "score": 0.5, "evidence": "Not called out as a distinct finding, but the C3 fix does replace `this.container.widgetTagger()` with an injected `tagger: WidgetTagger` port" },
+    { "id": "routes-call-repository", "caught": true, "score": 1, "evidence": "M1: quotes `new WidgetsRepository(container.db())` + `repo.countAll()` in the handler; cites the import-legality table routes -> repository = ✗" },
+    { "id": "validate-in-handler", "caught": true, "score": 1, "evidence": "M3: `body: z.unknown()` + `CreateWidget.parse(req.body)`; anti-pattern 6 / Fastify stack rule; fix = `schema: { body: CreateWidget }`" },
+    { "id": "repository-returns-row-type", "caught": true, "score": 1, "evidence": "M2: findById/listStaleUntagged return WidgetRow; service.get() leaks it into the serialized contract; fix = map via toWidget INSIDE the repository" },
+    { "id": "policy-in-repository", "caught": true, "score": 1, "evidence": "m3: 'listStaleUntagged() bakes the business definition of stale (STALE_AFTER_DAYS, untagged) into the where clause'; fix = decision in the service, repo exposes listUntaggedCreatedBefore(date)" },
+    { "id": "port-speaks-vendor", "caught": true, "score": 1, "evidence": "C1: quotes the `import('openai')` type in the port; cites Rule 1/2 + contracts-depend-on-nothing + anti-pattern 5; fix = `suggest(name: string)`" },
+    { "id": "port-in-vendor-shared", "caught": false, "score": 0, "evidence": "MISSED. C1 fixes the vendor-type import and m2 notes the two vendored copies, but the review never says this server-only port belongs in server/src/ports/ rather than vendor/shared" },
+    { "id": "contract-carries-transport-envelope", "caught": true, "score": 1, "evidence": "m1: 'WidgetsPage (items/page/pageSize/total/nextCursor) is HTTP pagination framing, not a domain shape'; cites the Zod stack rule; fix = build the envelope in routes.ts" },
+    { "id": "adapter-reads-env-secret", "caught": true, "score": 1, "evidence": "C4: quotes `new OpenAI({ apiKey: process.env.OPENAI_API_KEY })`; cites the SecretsProvider stack rule; fix = `constructor(apiKey: string)` resolved by the container" }
+  ],
+  "false_positives": [],
+  "must_not_flag_check": "PASS — 'Fine as-is' section correctly clears platform/errors.ts, ContainerOverrides.widgetTagger, and the service.get() read-through; no clean pattern flagged as a violation",
+  "extra_findings": ["m2: both vendored shared copies must change together (real anti-pattern 10, not a false positive)"],
+  "summary": { "caught": 9.5, "total": 11, "pass_rate": 0.864, "false_positives": 0 }
+}

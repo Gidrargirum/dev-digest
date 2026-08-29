@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Concludes the module's Onion / ring layering is sound", "passed": true, "evidence": "Verdict: 'The layering is sound. Dependencies point inward ... No dependency-direction rule is broken.' The reviewQueue point is explicitly framed as 'a design judgment, not a hard violation, and it is defensible'." },
+    { "text": "Does NOT flag the thin getDelivery pass-through as an 'anemic service' violation", "passed": true, "evidence": "Not raised; the 'business rules live in the service' row lists the real decisions and the pass-through is left alone." },
+    { "text": "Does NOT flag the platform/errors.ts import in the service", "passed": true, "evidence": "Not raised (errors.ts treated as fine cross-layer)." },
+    { "text": "Does NOT flag the service taking a secret: string constructor argument as wrong", "passed": true, "evidence": "'What is correct' table, Rule 4 row: 'The secret arrives as a resolved string, consistent with ... secrets flowing through SecretsProvider in the container.'" },
+    { "text": "Raises at most one minor/non-architectural note and does not invent a ring violation to justify 'changes requested'", "passed": true, "evidence": "Two items to resolve: getPullDetail (typecheck nit — a real fixture bug) and the reviewQueue ownership question (correctly labelled a design judgment / anti-pattern 7 smell, not a hard violation). Plus 2 non-blocking nits. No invented ring violation." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 105.7 },
+  "notes": ["Fixture note: the module was intended as a clean negative but contains one real cross-module coupling (WebhooksRepository writes reviewQueue) plus an invented port method name (getPullDetail). The skill run calibrated the coupling correctly as a soft ownership question."]
+}

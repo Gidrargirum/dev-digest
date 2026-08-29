@@ -1,0 +1,12 @@
+{
+  "eval_id": 2,
+  "eval_name": "reviewer-core-purity-review",
+  "prompt": "Review `evals/files/eval-3-reviewer-core/severity-enrich.ts` — a new file proposed for `reviewer-core/src/`. Does it belong there? Flag every architecture / layering rule it breaks and how you'd restructure it.",
+  "assertions": [
+    "Flags the node:fs readFileSync call (reading severity-rubric.json at import time) as I/O that must not happen in reviewer-core",
+    "Flags the import of RepoIntelRepository from server/src/modules as an inward ring depending on an outer ring (wrong direction)",
+    "Flags the fetch() call to the GitHub API as I/O that violates domain purity",
+    "Recommends moving data resolution to the caller and passing resolved values through ReviewInput (not identifiers)",
+    "Does not invent violations that are not present (no more than one clearly-wrong extra finding)"
+  ]
+}

@@ -127,5 +127,50 @@
       "medium": "medium",
       "high": "high"
     }
+  },
+  "brief": {
+    "title": "PR Brief",
+    "whatLabel": "What",
+    "whyLabel": "Why",
+    "riskLevel": "{level} risk",
+    "riskLevelName": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High"
+    },
+    "metrics": {
+      "score": "Score",
+      "verdict": "Verdict",
+      "cost": "Cost",
+      "tokens": "Tokens",
+      "duration": "Duration",
+      "findingsBlockers": "{findings} findings · {blockers} blockers",
+      "na": "N/A",
+      "dash": "—"
+    },
+    "verdictValue": {
+      "request_changes": "Request changes",
+      "approve": "Approve",
+      "comment": "Comment"
+    },
+    "regenerate": "Regenerate",
+    "recalculating": "Recalculating…",
+    "errorTitle": "Failed to load PR Brief",
+    "errorBody": "Something went wrong computing the brief for this PR.",
+    "retry": "Retry",
+    "nudgeTitle": "No PR Brief yet",
+    "nudgeBody": "Run a review to generate the brief, risk areas, and review focus for this PR.",
+    "kind": {
+      "security": "Security",
+      "dependency": "Dependency",
+      "performance": "Performance",
+      "data": "Data",
+      "api_change": "API change",
+      "other": "Other"
+    }
+  },
+  "reviewFocus": {
+    "title": "Review focus — read these first",
+    "count": "{count}"
   }
 }

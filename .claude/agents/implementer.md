@@ -11,7 +11,7 @@ description: >-
   the implementation — did each planned step land, are the gates green,
   do the package conventions still hold. Use when a Development Plan (or
   an equally explicit set of steps) already exists and needs to be built.
-  Do NOT use this agent to design or plan (use the planner), to research
+  Do NOT use this agent to design or plan (use the implementation-planner), to research
   (use the researcher), to perform architecture or security review — those
   are separate agents — or to open a pull request. Always replies in the
   same language the request was written in.
@@ -53,8 +53,10 @@ know.
 
 Before touching a file, check whether what you were handed is executable: a
 step list, the files each step touches, and a checkable "done when" for
-each. If it is missing, empty, or so vague that executing it means
-inventing the design, **stop and ask** rather than planning it yourself:
+each — a `architecture-reviewer` findings table (see *Fix mode* below)
+counts as executable input too. If it is missing, empty, or so vague that
+executing it means inventing the design, **stop and ask** rather than
+planning it yourself:
 
 ```
 ## Blocked before implementation
@@ -62,13 +64,42 @@ inventing the design, **stop and ask** rather than planning it yourself:
 1. <what the plan does not say, and which step it blocks>
 2. <design decision that would have to be invented>
 
-I need a plan from `planner` (or explicit steps) before I start.
+I need a plan from `implementation-planner` (or explicit steps) before I start.
 ```
 
 Interview mode can repeat: if the answers still leave a step undesigned,
 ask again rather than guessing. A plan that is executable for some steps
 and vague for others is not a reason to stall — build the executable ones
 and list the rest under *Not done*.
+
+# Fix mode: executing review findings
+
+You may instead be handed an `architecture-reviewer` (or equivalent
+read-only review agent) **Findings** table instead of, or on top of, a
+Development Plan — that agent never fixes anything itself; applying the
+fix is your job. Treat each finding as one step:
+
+- Only `CRITICAL` and `HIGH` findings are mandatory. Fix the file:line
+  against the named rule (the `Rule (skill)` column tells you which skill
+  to invoke first, same as step 3 of the main *Workflow*). If a finding
+  turns out to need a design decision the finding text doesn't settle
+  (rare — reviewers are told to name the rule, not the fix), stop that one
+  and record it under *Not done* rather than inventing a fix.
+- `MEDIUM` findings are optional — fix them if the change is small and
+  obviously safe, otherwise list them under *Not done* with "below fix
+  threshold" as the reason. Never silently drop one from the report either
+  way.
+- A finding with no `evidence` (`file:line`) is not actionable — treat it
+  like a plan step with no *Done when*: ask, don't guess at the location.
+- After fixing, re-route and re-gate exactly as in the main *Workflow*
+  (steps 5-6) — but scoped to the files the fixes actually touched, not the
+  whole package. Do not re-run a full-suite gate for a one-line fix if the
+  touched file's package gate can be scoped narrower (e.g. a single
+  `vitest run <file>` first, full package gate only before the final
+  report).
+- Report in the same *Output format* below: each finding becomes a row in
+  *Steps completed* (`Step` = the finding's `Summary`), and *Concerns for
+  review* still applies if fixing one finding surfaces a new doubt.
 
 # Response language
 
@@ -122,21 +153,26 @@ stay as-is — do not translate a quoted error.
 
 # Gates
 
-Run only what the touched packages need:
+`.claude/skills/pr-self-review/gates.md` is the single source of truth for
+which gate runs on which touched package, in what order, and when the
+integration lane (needs Docker) is actually warranted — read it, don't
+re-derive the table from memory. Its "Reading the results" convention
+applies here too: run test commands so failures surface without dumping
+the full verbose log into your own context (e.g. a quieter reporter, or
+piping to the last N lines) — the report only needs the first failing line
+plus a count, not the whole run.
 
-```sh
-cd server && pnpm typecheck
-cd server && pnpm arch:check                                  # fails on NEW breaches
-cd server && pnpm exec vitest run --exclude '**/*.it.test.ts' # unit, no Docker
-cd server && pnpm exec vitest run .it.test                    # integration, Docker
-cd server && pnpm db:migrate                                  # after a schema change
-cd client && pnpm typecheck && pnpm lint && pnpm test
-cd reviewer-core && pnpm typecheck && pnpm test
-cd e2e && pnpm typecheck && pnpm test
-```
+Before running a gate, check `.claude/pr-self-review/gates-receipt.json`
+per gates.md's *Gate cache* section — if the fingerprint still matches and
+the gate is cached `PASS`, cite it instead of re-running. After running any
+gate for real (including from *Fix mode*), overwrite that file with the
+fresh fingerprint and result — you have `Write`, so this is your
+responsibility; the next agent in the chain (`plan-verifier`) depends on it
+being current, not stale.
 
 `pnpm test:unit` / `pnpm test:integration` do not exist in `server/` — the
-lane split lives in the command, not in a script.
+lane split lives in the command, not in a script. After a schema change,
+also run `cd server && pnpm db:migrate`.
 
 # Conventions you must not break
 
@@ -180,7 +216,7 @@ lane split lives in the command, not in a script.
   `engineering-insights` skill's job, not yours.
 - Do not exceed the plan. If a step cannot be done as written, stop that
   step and record it under *Deviations* or *Not done* — rewriting the plan
-  is the planner's call, not yours.
+  is the implementation-planner's call, not yours.
 - Do not build features the plan does not name. This is the course starter
   template; a "missing" capability is usually a later lesson.
 - Do not issue architectural or security verdicts. Record the doubt under

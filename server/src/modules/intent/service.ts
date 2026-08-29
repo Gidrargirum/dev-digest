@@ -10,14 +10,14 @@ import {
 } from './helpers.js';
 import type { IntentDeps, IntentPort, ResolveForRunParams, ResolveForRunResult } from './types.js';
 
-/** The model proposes intent/scope/risk only — NEVER confidence (see
+/** The model proposes intent/scope only — NEVER confidence (see
  *  `confidenceFromSources` for why) and never a findings/score opinion
- *  (decision #3, plans/intent-layer.md §1 — intent is prompt context only). */
+ *  (decision #3, plans/intent-layer.md §1 — intent is prompt context only).
+ *  Risk assessment moved to the PR Brief (specs/2026-08-28-pr-brief.md, AC-15). */
 const IntentLlmSchema = z.object({
   intent: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
-  risk_areas: z.array(z.string()),
 });
 const INTENT_SCHEMA_NAME = 'PrIntent';
 
@@ -37,8 +37,7 @@ const INJECTION_GUARD =
 const SYSTEM_PROMPT =
   'You infer the INTENT of a pull request from its own title, branch name, description ' +
   'and changed files, plus any linked GitHub issue given to you. Produce one sentence of ' +
-  'intent, what is in scope, what is explicitly out of scope, and which areas carry ' +
-  'elevated review risk (e.g. auth, payments, migrations, public API surface, secrets). Be ' +
+  'intent, what is in scope, and what is explicitly out of scope. Be ' +
   'concrete and specific to THIS PR — generic filler like "improves the codebase" is ' +
   `worthless. If the sources give too little to go on, say so plainly in \`intent\` rather ` +
   `than inventing detail.\n\n${INJECTION_GUARD}`;
@@ -143,7 +142,6 @@ export class IntentService implements IntentPort {
       intent: res.data.intent,
       inScope: res.data.in_scope,
       outOfScope: res.data.out_of_scope,
-      riskAreas: res.data.risk_areas,
       sources,
       confidence,
       headSha: pull.headSha,

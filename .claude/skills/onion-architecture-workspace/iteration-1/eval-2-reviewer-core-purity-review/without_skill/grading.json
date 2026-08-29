@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags the node:fs readFileSync call (reading severity-rubric.json at import time) as I/O that must not happen in reviewer-core", "passed": true, "evidence": "Violation 4 'Filesystem I/O + import-time side effect': quotes the readFileSync line, notes import-time side effect, __dirname CJS-only, throws on missing file." },
+    { "text": "Flags the import of RepoIntelRepository from server/src/modules as an inward ring depending on an outer ring (wrong direction)", "passed": true, "evidence": "Violation 1 'Inward dependency rule broken — domain imports the outer ring': quotes the import, names the server->reviewer-core->server cycle, says arch:check/dependency-cruiser should reject the ../../server path. Marked 'the critical finding'." },
+    { "text": "Flags the fetch() call to the GitHub API as I/O that violates domain purity", "passed": true, "evidence": "Violation 3 'Network I/O in the domain': the fetch to api.github.com makes the domain a network client; belongs in an infrastructure adapter in server/." },
+    { "text": "Recommends moving data resolution to the caller and passing resolved values through ReviewInput (not identifiers)", "passed": true, "evidence": "Restructure section: synchronous pure enrichSeverity(findings, ctx) with rubric/hotFiles/changedFileCount injected; server gathers the three inputs. Also offers the inward-ports alternative but recommends passing plain data." },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "Extras (violation 2 DB I/O, violation 5 env secret, violation 6 not pure/deterministic) are all real consequences; none clearly wrong." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 48.9 },
+  "notes": ["Baseline matches the skill run almost point-for-point on this eval, including arch:check and the cycle; least differentiated of the three cases. Fewest tool calls (2)."]
+}

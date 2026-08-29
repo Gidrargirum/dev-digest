@@ -33,6 +33,7 @@
     "tabs": {
       "config": "Config",
       "preview": "Preview",
+      "context": "Context",
       "stats": "Stats",
       "versions": "Versions"
     }
@@ -48,6 +49,28 @@
     "save": "Save",
     "saving": "Saving…",
     "saved": "Saved (v{version})"
+  },
+  "context": {
+    "title": "Project context to use",
+    "hint": "Attach repository .md documents to this skill. Any agent with this skill enabled inherits them (AC-11).",
+    "attachedCount": "{attached} of {total} attached",
+    "tokenEstimate": "≈ {count} tokens",
+    "filterPlaceholder": "Filter documents…",
+    "emptyCatalog": "No documents found for this repository. Visit Project Context to check the repo's clone status.",
+    "moveUp": "Move {name} up",
+    "moveDown": "Move {name} down",
+    "detach": "Detach",
+    "broken": "broken",
+    "save": "Save context",
+    "saving": "Saving…",
+    "saved": "Context saved",
+    "savedToast": "Context saved",
+    "tokensShort": "{count}t",
+    "preview": "Preview",
+    "previewClose": "Close preview",
+    "previewPanel": "Document preview",
+    "previewError": "Couldn’t load this document",
+    "dragHandle": "Reorder {name} — drag, or use arrow keys"
   },
   "stats": {
     "usedBy": "Used by",

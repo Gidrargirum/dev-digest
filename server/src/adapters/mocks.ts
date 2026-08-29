@@ -33,6 +33,7 @@ import type {
   SecretKey,
 } from '@devdigest/shared';
 import { parseUnifiedDiff } from './git/diff-parser.js';
+import type { ContextDocEntry, ContextDocsReader, ContextDocsWriter } from '../ports/index.js';
 
 /**
  * Deterministic MOCK adapters for tests/dev — NO real network. Each mirrors the
@@ -342,5 +343,48 @@ export class MockSecretsProvider implements SecretsProvider {
   constructor(private secrets: Partial<Record<string, string>> = {}) {}
   async get(key: SecretKey): Promise<string | undefined> {
     return this.secrets[key as string];
+  }
+}
+
+// ---------- Mock ContextDocsReader ----------
+export interface MockContextDocsOptions {
+  /** Catalog entries returned by `list()`, regardless of `root`/`searchRoots`. */
+  entries?: ContextDocEntry[];
+  /** Content by repo-relative path, looked up by `read()`. */
+  files?: Record<string, string>;
+}
+
+/**
+ * Unlike `MockGitClient.readFile` (returns `''` on an unknown path — a
+ * documented trap, see insights/INSIGHTS.md 2026-08-13), `read()` here THROWS
+ * on an unknown path: "file missing" must be observable by absence, never by
+ * a silent empty string, so the run-executor's degrade-and-skip path (AC-21)
+ * is exercised the same way it would be against the real filesystem.
+ */
+export class MockContextDocsReader implements ContextDocsReader, ContextDocsWriter {
+  /** Every write() call, in order — the derived-projection assertions read this. */
+  public writes: { relPath: string; content: string }[] = [];
+  /** Every ensureDir() call, in order. */
+  public dirs: string[] = [];
+
+  constructor(private opts: MockContextDocsOptions = {}) {}
+
+  async list(_root: string, _searchRoots: string[]): Promise<ContextDocEntry[]> {
+    return this.opts.entries ?? [];
+  }
+
+  async read(_root: string, relPath: string): Promise<string> {
+    const content = this.opts.files?.[relPath];
+    if (content === undefined) throw new Error(`Document not found: ${relPath}`);
+    return content;
+  }
+
+  async write(_root: string, relPath: string, content: string): Promise<void> {
+    this.writes.push({ relPath, content });
+    this.opts.files = { ...(this.opts.files ?? {}), [relPath]: content };
+  }
+
+  async ensureDir(_root: string, relDir: string): Promise<void> {
+    this.dirs.push(relDir);
   }
 }

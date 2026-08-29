@@ -6,7 +6,7 @@ import React from "react";
 import { commentTargetFor, type CommentThread, type DiffCommentApi, cs } from "../comments";
 import { type DiffAnnotationApi, type DiffFindingMark } from "../annotations";
 import { type Line } from "../helpers";
-import { s, lineRowFor, lineSignFor } from "../styles";
+import { s, lineRowFor, lineSignFor, targetRowHighlight } from "../styles";
 import { CommentThreadView } from "../CommentThreadView";
 import { InlineComposer } from "../InlineComposer";
 import { FindingMarks } from "../FindingMarks";
@@ -18,6 +18,7 @@ export function CodeLine({
   commenting,
   marks,
   annotations,
+  highlightLine,
 }: {
   ln: Line;
   path: string;
@@ -27,9 +28,19 @@ export function CodeLine({
    *  `annotations` is undefined — plain diff mode is unaffected). */
   marks?: DiffFindingMark[];
   annotations?: DiffAnnotationApi;
+  /** Deep-link target line (AC-25) — flash this row and scroll it into view
+   *  while set. `null` in every non-deep-link render. */
+  highlightLine?: number | null;
 }) {
   const [hover, setHover] = React.useState(false);
   const [composing, setComposing] = React.useState(false);
+  const rowRef = React.useRef<HTMLDivElement>(null);
+  const isHit =
+    highlightLine != null &&
+    (ln.newNo === highlightLine || (ln.newNo == null && ln.oldNo === highlightLine));
+  React.useEffect(() => {
+    if (isHit) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [isHit]);
 
   if (ln.kind === "hunk") {
     return (
@@ -45,11 +56,13 @@ export function CodeLine({
 
   return (
     <div
+      ref={rowRef}
+      aria-current={isHit ? "location" : undefined}
       style={cs.rowWrap}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
-      <div style={lineRowFor(ln.kind)}>
+      <div style={isHit ? { ...lineRowFor(ln.kind), ...targetRowHighlight } : lineRowFor(ln.kind)}>
         <span className="mono tnum" style={{ ...s.lineNo, position: "relative" }}>
           {showAdd && target && (
             <button

@@ -35,9 +35,16 @@ import { IntentRepository } from '../modules/intent/repository.js';
 import { BlastService } from '../modules/blast/service.js';
 import type { BlastPort } from '../modules/blast/types.js';
 import { BlastRepository } from '../modules/blast/repository.js';
-import { getFeatureModelOverride } from '../modules/settings/feature-models.js';
+import { BriefService } from '../modules/brief/service.js';
+import type { BriefPort } from '../modules/brief/types.js';
+import { BriefRepository } from '../modules/brief/repository.js';
+import { getFeatureModelOverride, resolveFeatureModel } from '../modules/settings/feature-models.js';
 import { type DepGraph, DepCruiseGraph } from '../adapters/depgraph/index.js';
 import { type Tokenizer, TiktokenTokenizer } from '../adapters/tokenizer/index.js';
+import type { ContextDocsReader, ContextDocsWriter } from '../ports/index.js';
+import { FsContextDocsReader } from '../adapters/context-docs/index.js';
+import { ContextRepository } from '../modules/context/repository.js';
+import { ContextService } from '../modules/context/service.js';
 
 /**
  * DI container. One per app instance. Holds config, db, the JobRunner,
@@ -63,6 +70,12 @@ export interface ContainerOverrides {
   /** Intent facade — tests inject a mock IntentPort implementation. */
   intent?: IntentPort;
   blast?: BlastPort;
+  /** PR Brief facade — tests inject a mock BriefPort implementation. */
+  brief?: BriefPort;
+  /** Project Context Folder reader+writer — tests inject a mock implementation. */
+  contextDocs?: ContextDocsReader & ContextDocsWriter;
+  /** Project Context Folder service — tests inject a mock/stub ContextService. */
+  projectContext?: ContextService;
 }
 
 export class Container {
@@ -91,6 +104,9 @@ export class Container {
   private _priceBook?: PriceBook;
   private _intent?: IntentPort;
   private _blast?: BlastPort;
+  private _brief?: BriefPort;
+  private _contextDocs?: ContextDocsReader & ContextDocsWriter;
+  private _projectContext?: ContextService;
 
   constructor(config: AppConfig, db: Db, private overrides: ContainerOverrides = {}) {
     this.config = config;
@@ -179,6 +195,27 @@ export class Container {
     return this._blast;
   }
 
+  /**
+   * PR Brief facade (`modules/brief/README.md`) — generates + caches a PR's
+   * Brief on run completion, serves it on `POST /pulls/:id/brief`. Takes ports
+   * (`llm`, the resolved `risk_brief` model, and `this.blast`, which
+   * structurally satisfies `BriefBlastSource`), never `this`. Tests inject a
+   * mock via `ContainerOverrides.brief`.
+   */
+  get brief(): BriefPort {
+    if (this.overrides.brief) return this.overrides.brief;
+    this._brief ??= new BriefService(
+      {
+        llm: (provider) => this.llm(provider),
+        github: () => this.github(),
+        featureModel: (workspaceId) => resolveFeatureModel(this.db, workspaceId, 'risk_brief'),
+        blast: this.blast,
+      },
+      new BriefRepository(this.db),
+    );
+    return this._brief;
+  }
+
   /** Import-graph builder (dependency-cruiser). T3 indexer pipeline only. */
   get depgraph(): DepGraph {
     if (this.overrides.depgraph) return this.overrides.depgraph;
@@ -191,6 +228,30 @@ export class Container {
     if (this.overrides.tokenizer) return this.overrides.tokenizer;
     this._tokenizer ??= new TiktokenTokenizer();
     return this._tokenizer;
+  }
+
+  /** Project Context Folder — filesystem reader for the repo's doc roots (`config.contextSearchRoots`). */
+  get contextDocs(): ContextDocsReader & ContextDocsWriter {
+    if (this.overrides.contextDocs) return this.overrides.contextDocs;
+    this._contextDocs ??= new FsContextDocsReader();
+    return this._contextDocs;
+  }
+
+  /**
+   * Project Context Folder — catalog + attachment merge/resolve. Takes ports,
+   * not `this`, for the same cycle-avoidance reason as `repoIntel`/`intent`
+   * above (the container constructs it, so accepting `Container` would cycle).
+   */
+  get projectContext(): ContextService {
+    if (this.overrides.projectContext) return this.overrides.projectContext;
+    this._projectContext ??= new ContextService(
+      new ContextRepository(this.db),
+      this.contextDocs,
+      this.tokenizer,
+      this.config.contextSearchRoots,
+      this.contextDocs,
+    );
+    return this._projectContext;
   }
 
   /**

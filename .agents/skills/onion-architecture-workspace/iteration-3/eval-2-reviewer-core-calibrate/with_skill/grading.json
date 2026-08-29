@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "'non-deterministic - Date.now() is a clock read and Math.random() jitter makes the kept/dropped set and sort order irreproducible ... hermetic lane'",
+      "passed": true,
+      "evidence": "'non-deterministic - Date.now() is a clock read and Math.random() jitter makes the kept/dropped set and sort order irreproducible ... hermetic lane'"
+    },
+    {
+      "text": "'pass now (and any debug flag) as resolved parameters like priorSeenAt already is'; 'delete the random jitter'",
+      "passed": true,
+      "evidence": "'pass now (and any debug flag) as resolved parameters like priorSeenAt already is'; 'delete the random jitter'"
+    },
+    {
+      "text": "'reads process.env.CALIBRATE_DEBUG - env read in the pure engine, forbidden by SKILL.md rule 3, the decision tree, anti-pattern 9'",
+      "passed": true,
+      "evidence": "'reads process.env.CALIBRATE_DEBUG - env read in the pure engine, forbidden by SKILL.md rule 3, the decision tree, anti-pattern 9'"
+    },
+    {
+      "text": "'spreads a calibrationNote field onto PromptParts ... which assemblePrompt never renders - dead data that violates the feature off -> prompt byte-identical contract'",
+      "passed": true,
+      "evidence": "'spreads a calibrationNote field onto PromptParts ... which assemblePrompt never renders - dead data that violates the feature off -> prompt byte-identical contract'"
+    },
+    {
+      "text": "'The pure decay math itself and the priorSeenAt input shape are fine.' console.error extra correct; grounding-order point is 1 speculative extra - within the <=1 allowance",
+      "passed": true,
+      "evidence": "'The pure decay math itself and the priorSeenAt input shape are fine.' console.error extra correct; grounding-order point is 1 speculative extra - within the <=1 allowance"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

@@ -32,3 +32,52 @@ export interface DepGraph {
    */
   buildEdges(root: string, files: string[]): Promise<FileEdge[]>;
 }
+
+/** One `.md` document found under a project-context search root. */
+export interface ContextDocEntry {
+  /** Repo-relative path, forward-slash normalized. */
+  path: string;
+  sizeBytes: number;
+}
+
+/**
+ * Project Context Folder — reads `.md` documents from a repo clone's own
+ * `.devdigest/{specs,docs,insights}/` folders (never the repo's own top-level
+ * specs/docs/insights). The client has no notion of a search root or a file
+ * walk, so this stays out of vendor/shared.
+ */
+export interface ContextDocsReader {
+  /**
+   * Recursively list `.md` files under `searchRoots` (each repo-relative,
+   * e.g. `docs`, `specs`) inside `root` (the repo's clone path). Never
+   * throws — any filesystem error degrades to `[]`.
+   */
+  list(root: string, searchRoots: string[]): Promise<ContextDocEntry[]>;
+  /**
+   * Read a document's content. `relPath` MUST already be a path the caller
+   * verified against a catalog built by `list()` in this same run — this
+   * method itself re-verifies the resolved path stays under `root` (symlink
+   * / `..` / absolute-path escape) and throws otherwise.
+   */
+  read(root: string, relPath: string): Promise<string>;
+}
+
+/**
+ * Project Context Folder — write side (AC-24/25). The derived on-disk
+ * projection under `<root>/.devdigest/**` is rewritten from Postgres through
+ * this port; Postgres stays the source of truth, this is best-effort output.
+ *
+ * `relPath` MUST already be validated by the caller (no absolute, no `..`,
+ * inside a search root, `.md` for a doc) — but every method here re-resolves
+ * the path and throws if it escapes `root` (symlink / `..` / absolute), the
+ * same defense `ContextDocsReader.read` applies on the read side.
+ *
+ * `FsContextDocsReader` implements this interface too — one class, one shared
+ * root-containment check for reads and writes.
+ */
+export interface ContextDocsWriter {
+  /** Write `content` (utf8) to `<root>/<relPath>`, creating parent dirs. */
+  write(root: string, relPath: string, content: string): Promise<void>;
+  /** Ensure `<root>/<relDir>` exists (mkdir -p). */
+  ensureDir(root: string, relDir: string): Promise<void>;
+}

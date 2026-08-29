@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Identifies the Container dependency + container-constructs-it as a genuine no-circular cycle (not just testability/service-locator)", "passed": true, "evidence": "Finding 1: 'creates a construction cycle (the container builds the service while the service references the container). ... arch:check will flag the modules -> platform edge.' Cites sibling modules' documented avoidance." },
+    { "text": "Recommends the repo's established fix: an AlertsDeps-style ports object like repoIntel/intent/blast/brief", "passed": true, "evidence": "Finding 1 fix: 'add a small AlertsDeps type (as blast/types.ts / brief/types.ts do) and take { sink: AlertSink }.'" },
+    { "text": "Flags AlertSink port is in the wrong file: server/src/ports/ not vendor/shared/adapters.ts, because server-only + vendor/shared is vendored into the browser bundle", "passed": true, "evidence": "Finding 2: quotes the server/src/ports/index.ts header rule; 'it is vendored into the client, so every interface there lands in the browser's type surface'; move AlertSink to server/src/ports/." },
+    { "text": "Flags repository.findDeliverable puts delivery policy (retry-attempt cap, backoff cutoff) in the persistence ring; decision belongs in the service", "passed": false, "evidence": "MISSED. The 'Not flagged' section explicitly clears the repository: 'AlertsRepository ... mapping rows to the Alert domain type via helpers — correct repository boundary'. The attempts < MAX_DELIVERY_ATTEMPTS retry-cap policy encoded in SQL is not mentioned anywhere." },
+    { "text": "No more than one clearly-incorrect additional violation", "passed": true, "evidence": "No incorrect findings; only the missed policy issue (a false negative, not a wrong assertion)." }
+  ],
+  "summary": { "passed": 4, "failed": 1, "total": 5, "pass_rate": 0.8 },
+  "timing": { "total_duration_seconds": 65.0 },
+  "notes": ["Baseline (with repo access) matches the skill run on the two structural findings, including the subtle vendor/shared vs src/ports/ placement. The differentiator is the policy-in-repository finding, which only the skill run caught (anti-pattern 4)."]
+}

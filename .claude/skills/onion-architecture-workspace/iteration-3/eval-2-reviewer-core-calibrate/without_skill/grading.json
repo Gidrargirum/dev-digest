@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "'multiplies confidence by a Math.random() jitter ... non-deterministic and untestable'; '(4) reads the wall clock via Date.now() ... instead of taking now as a caller-resolved parameter'",
+      "passed": true,
+      "evidence": "'multiplies confidence by a Math.random() jitter ... non-deterministic and untestable'; '(4) reads the wall clock via Date.now() ... instead of taking now as a caller-resolved parameter'"
+    },
+    {
+      "text": "'add a now: number param ... return the note as plain data ({ findings, note })'",
+      "passed": true,
+      "evidence": "'add a now: number param ... return the note as plain data ({ findings, note })'"
+    },
+    {
+      "text": "'(1) reads process.env.CALIBRATE_DEBUG - the domain does no ambient env reads and tests run with no env/keys'",
+      "passed": true,
+      "evidence": "'(1) reads process.env.CALIBRATE_DEBUG - the domain does no ambient env reads and tests run with no env/keys'"
+    },
+    {
+      "text": "'(5) fabricates a calibrationNote field on PromptParts ... injects it unconditionally whenever findings exist - violating the optional slot omitted -> prompt byte-identical contract'",
+      "passed": true,
+      "evidence": "'(5) fabricates a calibrationNote field on PromptParts ... injects it unconditionally whenever findings exist - violating the optional slot omitted -> prompt byte-identical contract'"
+    },
+    {
+      "text": "'The decay/floor/sort logic itself is fine'; console.error extra correct; no wrong claim about server imports / priorSeenAt",
+      "passed": true,
+      "evidence": "'The decay/floor/sort logic itself is fine'; console.error extra correct; no wrong claim about server imports / priorSeenAt"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

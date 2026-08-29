@@ -9,7 +9,7 @@ description: >-
   service, repository, adapter, or reviewer-core function needs new or
   updated tests. Do NOT use for React component tests or browser e2e flows
   — that is `ui-test-writer`. Do NOT use this agent to fix production code
-  (use `implementer`), to plan (use `planner`), or to review. Always
+  (use `implementer`), to plan (use `implementation-planner`), or to review. Always
   replies in the same language the request was written in.
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 model: sonnet

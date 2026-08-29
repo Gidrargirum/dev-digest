@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Concludes the module's Onion / ring layering is sound", "passed": false, "evidence": "Verdict: 'There is one real architecture violation' — the reviewQueue write is presented as a hard violation with a formal 'Summary of rules broken' table (rules 1-3), rather than as a soft cross-module ownership question. The rest is cleared as sound, but the top-line conclusion is 'not clean'." },
+    { "text": "Does NOT flag the thin getDelivery pass-through as an 'anemic service' violation", "passed": true, "evidence": "Not raised." },
+    { "text": "Does NOT flag the platform/errors.ts import in the service", "passed": true, "evidence": "Explicitly cleared: 'Uses AppError / NotFoundError from platform/errors, which is explicitly cross-layer.'" },
+    { "text": "Does NOT flag the service taking a secret: string constructor argument as wrong", "passed": true, "evidence": "Treated as a non-blocking wiring preference (thunk vs eager), explicitly 'not a layering break'." },
+    { "text": "Raises at most one minor/non-architectural note and does not invent a ring violation to justify 'changes requested'", "passed": true, "evidence": "The reviewQueue coupling is a real issue (anti-pattern 7), not invented; the other two notes are correctly labelled non-ring. Borderline: it escalates the coupling to three numbered 'rules broken', but the underlying finding is legitimate." }
+  ],
+  "summary": { "passed": 4, "failed": 1, "total": 5, "pass_rate": 0.8 },
+  "timing": { "total_duration_seconds": 98.4 },
+  "notes": ["Same real finding as the skill run (reviewQueue cross-module write), but overstated as a hard multi-rule violation instead of a calibrated ownership judgment. Trap patterns (pass-through, errors.ts, secret:string) all correctly avoided."]
+}

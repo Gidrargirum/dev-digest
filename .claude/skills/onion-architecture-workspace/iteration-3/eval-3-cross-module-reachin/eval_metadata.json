@@ -1,0 +1,11 @@
+{
+  "eval_id": 3,
+  "eval_name": "cross-module-reachin",
+  "prompt": "PR under review: `server/src/modules/brief/service.ts` gains a `relatedPrsSection` method for the PR Brief. The excerpt (with its new imports) is in `evals/fixtures/cross-module-reachin/service-excerpt.ts`. Review it for Onion ring / module-boundary violations \u2014 name each rule broken and where the fix goes.",
+  "assertions": [
+    "Flags the `import { BlastRepository } from '../blast/repository.js'` + `new BlastRepository(...)` as a cross-module reach-in AND as naming a concrete class / reaching past the blast service into its repository",
+    "Recommends depending on the already-injected `this.deps.blast` (the `BlastPort`) instead of constructing blast's repository \u2014 i.e. the container is where the two modules compose",
+    "Flags the `import { BLAST_SYMBOL_CAP, formatSymbolList } from '../blast/helpers.js'` as an illegal cross-module import of another module's constants/helpers, and points the shared code to `modules/_shared/` (or back to blast's own returned data)",
+    "Does not invent a ring violation beyond the module-boundary problems (raises no more than one clearly-wrong extra finding)"
+  ]
+}

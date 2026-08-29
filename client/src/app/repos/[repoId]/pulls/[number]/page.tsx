@@ -6,7 +6,7 @@
 "use client";
 
 import React from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
 import { Skeleton, ErrorState } from "@devdigest/ui";
 import { AppShell } from "@/components/app-shell";
 import { RepoNotFound } from "@/components/repo-not-found";
@@ -14,24 +14,18 @@ import { PrDetailHeader } from "./_components/PrDetailHeader";
 import { OverviewTab } from "./_components/OverviewTab";
 import { FindingsTab } from "./_components/FindingsTab";
 import { DiffTab } from "./_components/DiffTab";
-import { readDiffMode } from "./_components/DiffTab/helpers";
-import type { DiffMode } from "./_components/DiffTab/constants";
 import RunTraceDrawer from "./_components/RunTraceDrawer";
 import { usePullDetail, usePulls } from "@/lib/hooks";
-import { useQueryClient } from "@tanstack/react-query";
 import { usePrReviews, useCancelRun, usePrActiveRuns, usePrRuns, useDeleteRun } from "@/lib/hooks/reviews";
 import { useActiveRepo, useRepoNotFound } from "@/lib/repo-context";
 import { ApiError } from "@/lib/api";
 import { githubPrUrl } from "@/lib/github-urls";
 import type { FindingRecord } from "@devdigest/shared";
-
-const KNOWN_TABS = ["overview", "findings", "diff"];
+import { usePrDetailController } from "./_hooks/usePrDetailController";
 
 export default function PRDetailPage() {
-  const params = useParams<{ repoId: string; number: string }>();
-  const search = useSearchParams();
-  const router = useRouter();
-  const { repoId, number } = params;
+  const routeParams = useParams<{ repoId: string; number: string }>();
+  const { repoId, number } = routeParams;
   const { activeRepo } = useActiveRepo();
   const repoNotFound = useRepoNotFound(repoId);
   // The route is keyed by PR number, but every PR API is keyed by the row's
@@ -45,52 +39,17 @@ export default function PRDetailPage() {
 
   // Live run tracking is SERVER-SOURCED (agent_runs status='running'): survives
   // navigation AND reload, and self-clears via polling when runs finish.
-  const qc = useQueryClient();
   const { data: activeRuns } = usePrActiveRuns(prId);
   const { data: prRuns } = usePrRuns(prId);
   const deleteRun = useDeleteRun(prId);
   const liveRunIds = (activeRuns ?? []).map((r) => r.run_id);
   const reviewRunning = liveRunIds.length > 0;
   const cancel = useCancelRun();
-  const invalidateActiveRuns = () => {
-    if (prId) qc.invalidateQueries({ queryKey: ["pr-active-runs", prId] });
-  };
-  // When a run settles (done OR failed) refresh the full run history too, so a
-  // just-failed run shows up in "Run history" immediately — no page reload.
-  const invalidateRunHistory = () => {
-    if (prId) qc.invalidateQueries({ queryKey: ["pr-runs", prId] });
-  };
-  // Intent is computed as a side effect of the review run (specs/pr-intent-
-  // layer.md), not its own mutation — nothing else invalidates ["pr-intent",
-  // prId], so without this the INTENT card only ever appears after a reload.
-  const invalidateIntent = () => {
-    if (prId) qc.invalidateQueries({ queryKey: ["pr-intent", prId] });
-  };
-
-  // An unknown value (including a stale `?tab=blast` link from before Blast
-  // Radius moved into Overview) falls back to Overview instead of rendering
-  // nothing — none of the `tab === ...` branches below would otherwise match.
-  const requestedTab = search.get("tab") ?? "overview";
-  const tab = KNOWN_TABS.includes(requestedTab) ? requestedTab : "overview";
-  const traceRunId = search.get("trace");
-  const targetFindingId = search.get("finding");
-  const diffMode: DiffMode = readDiffMode(search.get("diffMode"));
-  // Batches every param update into ONE URLSearchParams + ONE router.replace.
-  // `search` is a snapshot of the current render, so two sequential single-
-  // param `setParam` calls in the same handler would build from the same
-  // stale snapshot and overwrite each other (e.g. tab=findings then
-  // finding=<id> in the same click) — any multi-param navigation MUST go
-  // through this, not two setParam calls back to back.
-  const setParams = (entries: Array<[string, string | null]>) => {
-    const sp = new URLSearchParams(search.toString());
-    for (const [key, val] of entries) {
-      if (val == null) sp.delete(key);
-      else sp.set(key, val);
-    }
-    router.replace(`/repos/${repoId}/pulls/${number}${sp.toString() ? `?${sp.toString()}` : ""}`);
-  };
-  const setParam = (key: string, val: string | null) => setParams([[key, val]]);
-  const setTab = (t: string) => setParam("tab", t);
+  const {
+    tab, traceRunId, targetFindingId, targetFile, targetLine, diffMode,
+    setParams, setParam, setTab, invalidateActiveRuns, invalidateRunHistory,
+    invalidateIntent, invalidateBrief,
+  } = usePrDetailController(prId);
 
   // Reviews come newest-first; each is its own run (grouped into accordions).
   const runs = reviews ?? [];
@@ -160,7 +119,25 @@ export default function PRDetailPage() {
 
       <div style={{ padding: "24px 32px 44px", display: "flex", flexDirection: "column", gap: 24, maxWidth: 1080, margin: "0 auto" }}>
         {tab === "overview" && (
-          <OverviewTab prId={prId} prBody={pr.body} repoFullName={repoFullName} headSha={pr.head_sha} />
+          <OverviewTab
+            prId={prId}
+            prBody={pr.body}
+            repoFullName={repoFullName}
+            headSha={pr.head_sha}
+            reviewContext={{ runs: prRuns ?? [], reviews: runs }}
+            reviewActions={{
+              onRunStart: () => setTab("findings"),
+              onRunsStarted: () => invalidateActiveRuns(),
+            }}
+            onOpenFile={(path, line) =>
+              setParams([
+                ["tab", "diff"],
+                ["file", path],
+                ["line", line != null ? String(line) : null],
+                ["diffMode", null],
+              ])
+            }
+          />
         )}
 
         {tab === "findings" && (
@@ -185,6 +162,7 @@ export default function PRDetailPage() {
               invalidateActiveRuns();
               invalidateRunHistory();
               invalidateIntent();
+              invalidateBrief();
               refetchReviews();
             }}
           />
@@ -198,6 +176,8 @@ export default function PRDetailPage() {
             reviews={runs}
             canComment={pr.status === "open"}
             diffMode={diffMode}
+            targetFile={targetFile}
+            targetLine={targetLine}
             onSetDiffMode={(mode) => setParam("diffMode", mode === "smart" ? "smart" : null)}
             onOpenFinding={(id) => setParams([["tab", "findings"], ["finding", id], ["diffMode", null]])}
           />

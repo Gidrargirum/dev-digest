@@ -8,7 +8,7 @@ description: >-
   `cd e2e && pnpm test`). Use when a component, page, hook, or browser flow
   needs new or updated tests. Do NOT use for server, database, or
   reviewer-core tests — that is `api-test-writer`. Do NOT use this agent to
-  fix production code (use `implementer`), to plan (use `planner`), or to
+  fix production code (use `implementer`), to plan (use `implementation-planner`), or to
   review. Always replies in the same language the request was written in.
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 model: sonnet

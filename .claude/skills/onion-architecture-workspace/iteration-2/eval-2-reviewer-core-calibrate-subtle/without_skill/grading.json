@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags Date.now() clock read AND Math.random() jitter as domain-purity / determinism violations, treating clock and RNG as 'outside world'", "passed": true, "evidence": "Item 4: 'Date.now() — un-injected ambient clock, same impurity class as process.env.' Item 3: 'Math.random() jitter — hidden entropy makes the function non-reproducible and untestable.'" },
+    { "text": "Recommends passing now (and any randomness seed) as a resolved parameter and making ordering deterministic", "passed": true, "evidence": "'should be a now: number parameter'; 'drop or inject the RNG.'" },
+    { "text": "Flags process.env.CALIBRATE_VERBOSE as an env access violating reviewer-core purity", "passed": true, "evidence": "Item 1: 'Reads process.env.CALIBRATE_VERBOSE — domain must not touch the environment; tests run with no env.'" },
+    { "text": "Flags unconditional calibrationNote addition as breaking the 'optional prompt slot not passed -> byte-identical prompt' contract; slot must be omitted when empty", "passed": true, "evidence": "Item 5: 'invents a prompt slot that isn't on PromptParts and that assemblePrompt never renders; new slots are a governed contract, not an ad-hoc field mutation from a side module.' (Found by reading reviewer-core/src/prompt.ts.)" },
+    { "text": "Does not claim it must import from server/ or that priorSeenAt param is a violation; <=1 wrong extra", "passed": true, "evidence": "Does not claim a server import is needed; extras (PromptParts location, fingerprint->id) are correct." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 77.0 },
+  "notes": ["Non-discriminating eval: baseline matches the skill run point-for-point, including the repo-specific prompt-slot contract, because the prompt told it to read reviewer-core/src/prompt.ts. Domain-purity / hermetic-test reasoning is well-known and does not need the skill."]
+}

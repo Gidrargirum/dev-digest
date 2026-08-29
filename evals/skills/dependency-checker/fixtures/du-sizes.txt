@@ -1,0 +1,37 @@
+Disk sizes and fan-out, already collected for you (Bash is not available in this session —
+treat everything below as the output of `du -sk` / lockfile counts you would have run yourself).
+
+## node_modules total per package (du -sm node_modules)
+server          235 MB   (pnpm-lock.yaml present, 426 transitive packages in node_modules/.pnpm)
+client          644 MB   (pnpm-lock.yaml present, 561 transitive)
+reviewer-core   157 MB   (NO pnpm-lock.yaml, 89 transitive)
+mcp              83 MB   (pnpm-lock.yaml present, 142 transitive)
+e2e              74 MB   (NO pnpm-lock.yaml, 9 transitive)
+evals           333 MB   (pnpm-lock.yaml present, 185 transitive)
+
+## heaviest top-level installs (du -sk node_modules/*/, KB)
+server:        typescript 23388 · js-tiktoken 22008 · drizzle-orm 13484 · drizzle-kit 7612 ·
+               openai 7536 · zod 5136 · fastify 3552 · graphology 2724 · @types/node 2536 ·
+               vitest 1908 · @anthropic-ai/sdk 1884 · dependency-cruiser 1568
+client:        next 155960 · mermaid 77116 · lucide-react 37076 · typescript 23388 ·
+               react-dom 7264 · recharts 5288 · zod 5136 · jsdom 4248 · eslint 3880 ·
+               @types/node 2536 · vitest 1912 · @tanstack/react-query 1748
+reviewer-core: typescript 23396 · vite 13048 · @esbuild/darwin-arm64 10304 · openai 7540 ·
+               zod 5136 · rollup 2844 · @types/node 2544 · vitest 1912
+mcp:           typescript 23396 · @modelcontextprotocol/sdk 6076 · zod 5136 · @types/node 2544 ·
+               vitest 1912 · tsx 676
+e2e:           typescript 23396 · @esbuild/darwin-arm64 10304 · @types/node 2544 · tsx 676 ·
+               undici-types 196 · fsevents 180 · esbuild 144
+evals:         typescript 23388 · openai 7536 · @anthropic-ai/claude-agent-sdk 3636 ·
+               @types/node 2544 · vitest 1908 · tsx 668 · gray-matter 80
+
+## resolved versions (node -p require(pkg/package.json).version)
+typescript  5.9.3   in all 6 packages
+vitest      2.1.9   in server, client, reviewer-core, mcp, evals
+zod         3.25.76 in server, client, reviewer-core, mcp
+openai      4.104.0 in server, reviewer-core, evals
+@types/node 22.19.19 (server, client) / 22.20.1 (reviewer-core, mcp, e2e) / 22.20.0 (evals)
+tsx         4.22.4 (server, evals) / 4.23.12 (reviewer-core, mcp, e2e)
+
+## declared ranges that differ from the rest
+evals/package.json: "typescript": "^5.6.0", "vitest": "^2.1.0"   (every other package: "^5.7.2" / "^2.1.8")

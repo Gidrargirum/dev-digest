@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 /**
  * PR Brief building blocks: Intent, Blast radius, Risks, PR History,
- * Smart Diff. Composed into PrBrief.
+ * Smart Diff. The model-authored `Brief { what, why, risk_level, risks[],
+ * review_focus[] }` is the single risk surface (see specs/2026-08-28-pr-brief.md);
+ * the persisted/transport shape `PrBriefRecord` lives in `review-api.ts`.
  */
 
 // ---- Intent ----
@@ -13,7 +15,6 @@ export const Intent = z.object({
   intent: z.string(),
   in_scope: z.array(z.string()),
   out_of_scope: z.array(z.string()),
-  risk_areas: z.array(z.string()).default([]),
   confidence: IntentConfidence.default('low'),
   sources: z.array(z.string()).default([]),
 });
@@ -94,8 +95,20 @@ export type PrBlastResponse = z.infer<typeof PrBlastResponse>;
 export const RiskSeverity = z.enum(['high', 'medium', 'low']);
 export type RiskSeverity = z.infer<typeof RiskSeverity>;
 
+/** The closed set of risk categories a `Risk.kind` may take (AC-16) — replaces
+ *  the former free string, so a drifted kind is rejected by contract validation. */
+export const RiskAreaKind = z.enum([
+  'security',
+  'dependency',
+  'performance',
+  'data',
+  'api_change',
+  'other',
+]);
+export type RiskAreaKind = z.infer<typeof RiskAreaKind>;
+
 export const Risk = z.object({
-  kind: z.string(),
+  kind: RiskAreaKind,
   title: z.string(),
   explanation: z.string(),
   severity: RiskSeverity,
@@ -107,6 +120,32 @@ export const Risks = z.object({
   risks: z.array(Risk),
 });
 export type Risks = z.infer<typeof Risks>;
+
+// ---- PR Brief (model output) ----
+/** The Brief's model-assessed merge risk — drives the card's accent rail (AC-18). */
+export const RiskLevel = z.enum(['low', 'medium', 'high']);
+export type RiskLevel = z.infer<typeof RiskLevel>;
+
+/** One "read this first" entry: a short label plus grounded file references. */
+export const ReviewFocusItem = z.object({
+  label: z.string(),
+  file_refs: z.array(z.string()),
+});
+export type ReviewFocusItem = z.infer<typeof ReviewFocusItem>;
+
+/**
+ * The generated, cached PR Brief — one structured `risk_brief` LLM call per
+ * `(pr_id, head_sha)`. Review metrics (verdict/score/cost/tokens) are
+ * deliberately NOT here — they stay on `RunSummary` / the review record.
+ */
+export const Brief = z.object({
+  what: z.string(),
+  why: z.string(),
+  risk_level: RiskLevel,
+  risks: z.array(Risk),
+  review_focus: z.array(ReviewFocusItem),
+});
+export type Brief = z.infer<typeof Brief>;
 
 // ---- PR History ----
 export const PrHistoryItem = z.object({
@@ -158,12 +197,3 @@ export const SmartDiff = z.object({
   }),
 });
 export type SmartDiff = z.infer<typeof SmartDiff>;
-
-// ---- Composed PR Brief (pr_brief.json) ----
-export const PrBrief = z.object({
-  intent: Intent,
-  blast: BlastRadius,
-  risks: Risks,
-  history: PrHistory,
-});
-export type PrBrief = z.infer<typeof PrBrief>;

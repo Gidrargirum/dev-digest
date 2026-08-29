@@ -30,6 +30,7 @@ file routinely lands in several slices. A `repository.ts` is both
 | `.github/workflows/**` | config | — → rule **B10**, `TESTING.md` lanes |
 | `.claude/skills/**`, `skills-lock.json` | config | — → `scripts/check-skills-lock.mjs` gate |
 | `.claude/agents/**` | config | — → `.claude/agents/README.md` house style; no mechanical gate exists |
+| `.claude/commands/**` | config | — → manual check against the referenced skill/agent names actually existing on disk; no mechanical gate exists |
 | `**/*.md`, `docs/**`, `specs/**`, `insights/**` | docs | — |
 
 `security` has no glob because it has no boundary: an injection, a leaked key or
@@ -51,6 +52,8 @@ skills are absent from the matrix **on purpose** and must not be reported:
 | Skill | Why |
 |---|---|
 | `engineering-insights` | authoring skill, runs at end of session — reviews nothing |
+| `workflow-retro` | cost/latency post-mortem on a pipeline run, invoked manually — reviews nothing |
+| `dependency-checker` | dependency audit skill, invoked manually — measures and advises, reviews no diff |
 | `mermaid-diagram` | authoring skill for diagrams |
 | `pr-self-review` | this skill |
 | `api-contract-breaking-change` | product content for DevDigest's own Skills Lab, not a repo-diff-review skill — see `.claude/skills/README.md` |

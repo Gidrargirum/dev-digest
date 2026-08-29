@@ -33,6 +33,7 @@ If a test wouldn't catch a class of regression we care about, we don't write it.
 | mcp | `mcp/` | unit (hermetic, stubbed fetch) | vitest | `mcp.yml` | no |
 | e2e web | `e2e/` | browser e2e (deterministic) | agent-browser + `run.ts` | `e2e-web.yml` | yes (stack) |
 | guards | — | repo invariants (vendored-copy drift, skills-lock) | plain Node scripts | `guards.yml` | no |
+| harness evals | `evals/` | PR-selected model behavior | vitest + Claude Agent SDK | `evals.yml` | LiteLLM container |
 
 ## What each suite covers
 
@@ -68,6 +69,10 @@ fails when the two vendored `@devdigest/shared` copies drift (each side
 type-checks fine alone, so nothing else catches it); `check-skills-lock.mjs`
 fails when `skills-lock.json` pins a skill that is not on disk.
 
+**harness evals** — a key-free detector maps changed skills, agents, and instruction files to
+existing eval suites. Missing targeted evals are successful explicit skips. Trusted same-repo PRs
+run selected model suites sequentially through OpenRouter; fork PRs never receive the secret.
+
 ## Running locally
 
 ```sh
@@ -85,6 +90,9 @@ cd server && pnpm arch:check && pnpm arch:ratchet               # Onion boundari
 # repo-wide guards (no install needed)
 node scripts/sync-shared.mjs --check
 node scripts/check-skills-lock.mjs
+
+# eval CI's hermetic preflight (no model key/network)
+cd evals && pnpm test:ci && pnpm typecheck
 
 # browser e2e (needs the full stack + agent-browser CLI)
 ./scripts/dev.sh

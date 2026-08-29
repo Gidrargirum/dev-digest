@@ -1,0 +1,12 @@
+{
+  "eval_id": 0,
+  "eval_name": "notifications-module-review",
+  "prompt": "A teammate opened a PR adding a new `notifications` feature module to `server/`. The three files are in `evals/files/eval-1-notifications/` (routes.ts, service.ts, repository.ts). Review it for backend layering / architecture problems before we merge. List each problem, the ring rule it breaks, and how to fix it.",
+  "assertions": [
+    "Flags that service.ts performs database access directly (imports db/client and db/schema, builds Drizzle queries) instead of delegating to the repository",
+    "Flags that NotificationsService takes `Container` as a constructor parameter instead of the specific ports it needs",
+    "Flags that routes.ts imports and calls NotificationsRepository directly, bypassing the service layer",
+    "Does not invent violations that are not present (no more than one clearly-wrong extra finding)",
+    "For each real finding, names the correct fix (move persistence into the repository; inject ports; route through the service)"
+  ]
+}

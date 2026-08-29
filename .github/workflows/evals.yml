@@ -1,0 +1,200 @@
+# PR-aware model evals for skills, agents, and repository instructions.
+name: harness evals
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Eval scope to run
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - workflow
+  pull_request:
+    paths:
+      - '.claude/skills/**'
+      - '.claude/agents/**'
+      - '!.claude/agents/README.md'
+      - '.claude/settings*.json'
+      - '.claude/hooks/**'
+      - '.claude/commands/**'
+      - '**/AGENTS.md'
+      - '**/CLAUDE.md'
+      - 'evals/**'
+      - '.github/workflows/evals.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-evals-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  detect:
+    name: select evals
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.select.outputs.matrix }}
+      has_work: ${{ steps.select.outputs.has_work }}
+      integrity_errors: ${{ steps.select.outputs.integrity_errors }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - name: Verify detector and model routing
+        working-directory: evals
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm test:ci
+          pnpm typecheck
+      - name: Detect changed eval targets
+        id: select
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_SCOPE: ${{ inputs.scope }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT_NAME" = 'workflow_dispatch' ]; then
+            FORCE_SCOPE="$MANUAL_SCOPE"
+            CHANGED_FILES=''
+            export FORCE_SCOPE
+          else
+            CHANGED_FILES="$(git diff --name-only --diff-filter=ACMRTD "$BASE_SHA" "$HEAD_SHA")"
+          fi
+          export CHANGED_FILES
+          node evals/scripts/ci-detect.mjs
+      - name: Fail invalid selected eval contracts
+        env:
+          INTEGRITY_ERRORS: ${{ steps.select.outputs.integrity_errors }}
+        run: |
+          if [ "$INTEGRITY_ERRORS" != '[]' ]; then
+            echo 'Harness integrity errors:' >&2
+            jq -r '.[]' <<< "$INTEGRITY_ERRORS" >&2
+            exit 1
+          fi
+      - name: Record execution policy
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          CONTENT_MODEL: ${{ vars.EVAL_CONTENT_MODEL || 'deepseek/deepseek-v4-flash-0731' }}
+          TOOL_MODEL: ${{ vars.EVAL_TOOL_MODEL || 'google/gemini-2.5-flash' }}
+          JUDGE_MODEL: ${{ vars.EVAL_JUDGE_MODEL || 'google/gemini-2.5-flash' }}
+        run: |
+          {
+            echo '## Eval execution policy'
+            echo "- Content model: $CONTENT_MODEL"
+            echo "- Tool/workflow model: $TOOL_MODEL"
+            echo "- Judge model: $JUDGE_MODEL"
+            if [ "$EVENT_NAME" = 'pull_request' ] && [ "$IS_FORK" = 'true' ]; then
+              echo '- Trust policy: fork PR; model evals are skipped without secrets.'
+            else
+              echo '- Trust policy: trusted same-repository or manual run; selected model evals execute.'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Explain fork policy
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && steps.select.outputs.has_work == 'true'
+        run: |
+          echo '## Model eval execution' >> "$GITHUB_STEP_SUMMARY"
+          echo 'SKIP model evals: fork pull requests cannot access the trusted OpenRouter secret.' >> "$GITHUB_STEP_SUMMARY"
+
+  eval:
+    name: ${{ matrix.tier }} / ${{ matrix.name }}
+    needs: detect
+    if: needs.detect.outputs.has_work == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix: ${{ fromJSON(needs.detect.outputs.matrix) }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: evals
+    env:
+      EVAL_BACKEND: openrouter
+      OPENROUTER_BASE_URL: http://localhost:4000
+      EVAL_CONTENT_MODEL: ${{ vars.EVAL_CONTENT_MODEL || 'deepseek/deepseek-v4-flash-0731' }}
+      EVAL_TOOL_MODEL: ${{ vars.EVAL_TOOL_MODEL || 'google/gemini-2.5-flash' }}
+      EVAL_JUDGE_MODEL: ${{ vars.EVAL_JUDGE_MODEL || 'google/gemini-2.5-flash' }}
+      EVAL_QUIET: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: evals/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: Check OpenRouter secret
+        id: key
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: |
+          if [ -n "$OPENROUTER_API_KEY" ]; then
+            echo 'available=true' >> "$GITHUB_OUTPUT"
+          else
+            echo '## Model eval execution' >> "$GITHUB_STEP_SUMMARY"
+            echo 'FAIL model evals: OPENROUTER_API_KEY is not configured for trusted execution.' >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+      - name: Start LiteLLM bridge
+        if: steps.key.outputs.available == 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: pnpm proxy:up
+      - name: Run selected suite
+        if: steps.key.outputs.available == 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          SUITE_PATH: ${{ matrix.path }}
+        run: |
+          echo "Running eval suite: $SUITE_PATH"
+          pnpm exec vitest run "$SUITE_PATH" --no-file-parallelism
+      - name: LiteLLM diagnostics
+        if: failure() && steps.key.outputs.available == 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: docker compose -f proxy/docker-compose.yml logs --tail 50
+      - name: Stop LiteLLM bridge
+        if: always() && steps.key.outputs.available == 'true'
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+        run: pnpm proxy:down
+      - name: Upload eval records
+        if: always() && steps.key.outputs.available == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-eval-records-${{ github.run_id }}-${{ matrix.tier }}-${{ matrix.name }}
+          path: evals/results/
+          if-no-files-found: ignore
+      - name: Record suite outcome
+        if: always()
+        env:
+          SUITE_TIER: ${{ matrix.tier }}
+          SUITE_NAME: ${{ matrix.name }}
+          SUITE_PATH: ${{ matrix.path }}
+          SUITE_OUTCOME: ${{ job.status }}
+          CONTENT_MODEL: ${{ vars.EVAL_CONTENT_MODEL || 'deepseek/deepseek-v4-flash-0731' }}
+          TOOL_MODEL: ${{ vars.EVAL_TOOL_MODEL || 'google/gemini-2.5-flash' }}
+          JUDGE_MODEL: ${{ vars.EVAL_JUDGE_MODEL || 'google/gemini-2.5-flash' }}
+        run: |
+          {
+            echo "## Eval outcome: $SUITE_TIER/$SUITE_NAME"
+            echo "- Path: $SUITE_PATH"
+            echo "- Outcome: $SUITE_OUTCOME"
+            echo "- Models: content=$CONTENT_MODEL, tool=$TOOL_MODEL, judge=$JUDGE_MODEL"
+          } >> "$GITHUB_STEP_SUMMARY"

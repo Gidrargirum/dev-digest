@@ -1,0 +1,35 @@
+{
+  "expectations": [
+    {
+      "text": "C1: 'service.ts -> platform/container.ts -> service.ts is a genuine circular dependency ... arch:check will fail (baseline is a ratchet)'",
+      "passed": true,
+      "evidence": "C1: 'service.ts -> platform/container.ts -> service.ts is a genuine circular dependency ... arch:check will fail (baseline is a ratchet)'"
+    },
+    {
+      "text": "C1 fix: add modules/alerts/types.ts with AlertsDeps (mirroring RepoIntelDeps); container passes assembled ports",
+      "passed": true,
+      "evidence": "C1 fix: add modules/alerts/types.ts with AlertsDeps (mirroring RepoIntelDeps); container passes assembled ports"
+    },
+    {
+      "text": "C2: AlertSink -> server/src/ports/ not vendor/shared; SKILL rule 2 + ports/index.ts header + client never delivers an alert",
+      "passed": true,
+      "evidence": "C2: AlertSink -> server/src/ports/ not vendor/shared; SKILL rule 2 + ports/index.ts header + client never delivers an alert"
+    },
+    {
+      "text": "M1: MAX_DELIVERY_ATTEMPTS evaluated in repository.ts:23 -> policy in persistence ring; anti-pattern 4; fix = pass maxAttempts param",
+      "passed": true,
+      "evidence": "M1: MAX_DELIVERY_ATTEMPTS evaluated in repository.ts:23 -> policy in persistence ring; anti-pattern 4; fix = pass maxAttempts param"
+    },
+    {
+      "text": "Only extra is the correct ContainerOverrides note; 'Not flagged' clears job-body + domain-type mapping",
+      "passed": true,
+      "evidence": "Only extra is the correct ContainerOverrides note; 'Not flagged' clears job-body + domain-type mapping"
+    }
+  ],
+  "summary": {
+    "passed": 5,
+    "failed": 0,
+    "total": 5,
+    "pass_rate": 1.0
+  }
+}

@@ -124,7 +124,6 @@ describe('rowToIntentRecord — read-boundary validation', () => {
       intent: 'Adds rate limiting.',
       inScope: ['api'],
       outOfScope: [],
-      riskAreas: [],
       sources: ['pr_title', 'pr_branch'],
       confidence: 'medium',
       headSha: 'a1b2c3d4',

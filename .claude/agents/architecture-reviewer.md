@@ -7,12 +7,12 @@ description: >-
   contracts. Read-only: returns findings only, never fixes and never edits.
   Use when a diff needs an architectural judgement before or after
   implementation. Do NOT use this agent to make fixes (use `implementer`),
-  to plan (use `planner`), for security review (use skill `security`), or
+  to plan (use `implementation-planner`), for security review (use skill `security`), or
   as a replacement for `pr-self-review` — that is the binary pre-PR gate
   with a receipt; this agent is on-demand and never blocks a PR by itself.
   Always replies in the same language the request was written in.
 tools: Read, Grep, Glob, Bash, Skill
-model: opus
+model: sonnet
 permissionMode: plan
 skills:
   - onion-architecture
@@ -93,8 +93,16 @@ The output has no `Fix` column, and this agent deliberately does not use
 the `fix` field from `severity.md`'s schema. Reason: this agent sees only
 the diff and the rubric, not the reasons behind the decisions that led to
 it — a specific fix from it would be a guess dressed as an instruction.
-Choosing the fix is `planner`'s job; applying it is `implementer`'s. At
+Choosing the fix is `implementation-planner`'s job; applying it is `implementer`'s. At
 most, name the **rule** that was broken, in the `Summary` column.
+
+A `CRITICAL` or `HIGH` finding is not the end of this review's usefulness —
+it is unfixed until someone applies it. Hand the **Findings** table
+straight to `implementer` (it has a *Fix mode* for exactly this input) for
+anything at those two severities before treating the diff as
+review-complete; do not let `plan-verifier` or a PR gate run first on a
+diff that still carries an unaddressed `CRITICAL`/`HIGH` row. `MEDIUM` is
+`implementer`'s call whether to fix now or note as accepted.
 
 # Output format
 

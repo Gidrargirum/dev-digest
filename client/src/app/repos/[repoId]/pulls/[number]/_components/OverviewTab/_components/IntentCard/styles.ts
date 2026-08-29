@@ -71,19 +71,69 @@ export const s = {
     borderTop: "1px solid var(--border)",
     paddingTop: 14,
   } satisfies CSSProperties,
-  riskChips: {
+  riskList: {
+    listStyle: "none",
+    margin: 0,
+    padding: 0,
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  } satisfies CSSProperties,
+  riskRow: {
+    border: "1px solid var(--border)",
+    borderRadius: 6,
+    background: "var(--bg-surface)",
+    overflow: "hidden",
+  } satisfies CSSProperties,
+  riskHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "8px 10px",
+    cursor: "pointer",
+    fontSize: 13,
+  } satisfies CSSProperties,
+  riskTitle: {
+    flex: 1,
+    minWidth: 0,
+    color: "var(--text-primary)",
+    lineHeight: 1.4,
+  } satisfies CSSProperties,
+  chevron: (open: boolean) =>
+    ({
+      color: "var(--text-muted)",
+      flexShrink: 0,
+      transform: open ? "rotate(180deg)" : "none",
+      transition: "transform .12s",
+    }) satisfies CSSProperties,
+  riskBody: {
+    borderTop: "1px solid var(--border)",
+    padding: "10px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
+  } satisfies CSSProperties,
+  riskExplanation: {
+    margin: 0,
+    fontSize: 13,
+    lineHeight: 1.5,
+    color: "var(--text-secondary)",
+  } satisfies CSSProperties,
+  riskRefs: {
     display: "flex",
     flexWrap: "wrap",
     gap: 8,
+    padding: "0 10px 9px 32px",
   } satisfies CSSProperties,
-  /** Badge ships `white-space: nowrap`, which is right for a short label and
-   *  wrong here: a risk area is a model-written sentence, and an unwrappable
-   *  chip overflows the card instead of growing taller. Overridden through the
-   *  `style` prop because `vendor/ui` is not ours to edit. */
-  riskChip: {
-    whiteSpace: "normal",
-    textAlign: "left",
-    lineHeight: 1.45,
+  riskRef: {
+    fontFamily: "var(--font-mono, monospace)",
+    fontSize: 12,
+    color: "var(--accent-text)",
+    background: "transparent",
+    border: "none",
+    padding: 0,
+    cursor: "pointer",
+    textDecoration: "underline",
   } satisfies CSSProperties,
   footer: {
     display: "flex",

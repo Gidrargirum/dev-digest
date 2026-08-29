@@ -1,0 +1,12 @@
+{
+  "expectations": [
+    { "text": "Flags that service.ts performs database access directly (imports db/client and db/schema, builds Drizzle queries) instead of delegating to the repository", "passed": true, "evidence": "Critical finding 1: names the db singleton import, the Drizzle table + operators, and the direct db.select/db.insert calls; notes an existing NotificationsRepository is ignored." },
+    { "text": "Flags that NotificationsService takes `Container` as a constructor parameter instead of the specific ports it needs", "passed": true, "evidence": "Major finding 4: 'Service depends on the whole Container (service-locator anti-pattern)'; recommends injecting NotificationsRepository and a GithubPort." },
+    { "text": "Flags that routes.ts imports and calls NotificationsRepository directly, bypassing the service layer", "passed": true, "evidence": "Critical finding 2: 'Route calls the repository directly and holds domain logic'; recommends a service.markRead and deleting the repository import from routes.ts." },
+    { "text": "Does not invent violations that are not present (no more than one clearly-wrong extra finding)", "passed": true, "evidence": "Extras (row type crossing, github not behind injected port, wiring in route file, isNull cast bug, dead code) are all real; none clearly wrong." },
+    { "text": "For each real finding, names the correct fix (move persistence into the repository; inject ports; route through the service)", "passed": true, "evidence": "Each finding has a Fix line: inject repository, move query into repo method; add service.markRead throwing NotFoundError; inject explicit collaborators." }
+  ],
+  "summary": { "passed": 5, "failed": 0, "total": 5, "pass_rate": 1.0 },
+  "timing": { "total_duration_seconds": 60.8 },
+  "notes": ["Baseline already catches all three planted violations plus valid extras; more verbose (8 findings) and less tied to named repo rules, but correct. Also caught a real latent bug (eq(col, null))."]
+}

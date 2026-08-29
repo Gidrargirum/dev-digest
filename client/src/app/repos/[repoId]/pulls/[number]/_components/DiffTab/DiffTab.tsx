@@ -23,6 +23,10 @@ interface DiffTabProps {
   /** Owned by page.tsx, kept in `?diffMode=` so it survives a round trip
    *  through the Agent runs tab. Defaults to "normal" (see ./constants). */
   diffMode: DiffMode;
+  /** Deep-link target from `?file=` / `?line=` (AC-24/25). Purely a lookup key
+   *  against `files` — an unmatched value renders the diff normally (AC-27). */
+  targetFile?: string | null;
+  targetLine?: number | null;
   onSetDiffMode: (mode: DiffMode) => void;
   /** Deep-links straight to the finding's card — routed through page.tsx's
    *  batched `setParams` (tab + finding + clearing diffMode in one replace). */
@@ -36,6 +40,8 @@ export function DiffTab({
   reviews,
   canComment,
   diffMode,
+  targetFile,
+  targetLine,
   onSetDiffMode,
   onOpenFinding,
 }: DiffTabProps) {
@@ -115,7 +121,12 @@ export function DiffTab({
       {diffMode === "smart" ? (
         <SmartDiffView files={files} reviews={reviews} onOpenFinding={onOpenFinding} />
       ) : (
-        <DiffViewer files={files} commenting={commenting} />
+        <DiffViewer
+          files={files}
+          commenting={commenting}
+          targetFile={targetFile}
+          targetLine={targetLine}
+        />
       )}
     </section>
   );

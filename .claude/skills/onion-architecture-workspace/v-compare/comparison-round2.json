@@ -1,0 +1,28 @@
+{
+  "comparison": "onion-architecture OLD vs NEW — round 2",
+  "change_under_test": "NEW adds anti-pattern §12 ('a cross-module `import type` is still a cross-module import') on top of round-1's §11. OLD has neither (confirmed by grep: skill-OLD/anti-patterns.md has 0 occurrences of '## 11.' / '## 12.'; the new skill has both).",
+  "fixture": "v-compare/fixtures/digests/ — the round-1 digests fixture + one added line in service.ts: `import type { ReviewRunSummary } from '../reviews/types.js'`, used only to annotate a private helper whose data comes from an injected callback (so the inversion is correct; the type import is the sole violation).",
+  "runs_per_version": 1,
+  "result": {
+    "OLD": { "pass_rate": 0.90, "caught": 4.5, "total": 5, "false_positives": 0, "time_seconds": 84.9, "tokens": 51070 },
+    "NEW": { "pass_rate": 1.0,  "caught": 5.0, "total": 5, "false_positives": 0, "time_seconds": 81.5, "tokens": 53734 },
+    "delta": { "pass_rate": "+0.10", "time_seconds": "-3.4", "tokens": "+2664" }
+  },
+  "per_finding": {
+    "cross-module-type-import (DISCRIMINATOR)": {
+      "OLD": "CAUGHT, score 0.75 — flagged `import type { ReviewRunSummary } from '../reviews/types.js'` as 'cross-module type coupling (anti-pattern #7)', gave the right fix ('the type should be local/_shared'), and correctly left the injected recentRuns callback alone. Did NOT name the §12-specific point: import type compiles away, dependency-cruiser skips type-only edges, so arch:check stays green and it feels exempt.",
+      "NEW": "CAUGHT, score 1.0 — cited anti-pattern §12 by name and 'another module's private surface'."
+    },
+    "cross-module-data-reachin": { "OLD": "caught, framed as §7 + duplicate-pgTable", "NEW": "caught, cited §11 + 'one module, one aggregate'" },
+    "cross-module-value-import (§7 control)": { "OLD": "caught", "NEW": "caught" },
+    "service-does-drizzle (control)": { "OLD": "caught", "NEW": "caught" },
+    "policy-in-repository (§4 control)": { "OLD": "caught ('lower confidence')", "NEW": "caught" }
+  },
+  "verdict": "Same outcome as round 1 and as all four with/without iterations: the specific rule the NEW skill adds is a PRECISION improvement, not a RECALL one. The OLD skill's generic anti-pattern §7 ('don't import from another module') plus the model's own reasoning generalised straight to 'a type import is the same coupling' — so the OLD run caught the violation, just labelled it §7 and skipped the compiles-away/arch:check-blind-spot nuance. Controls even at 3/3 both sides, 0 false positives either side.",
+  "why_no_recall_gap": "A cross-module `import type` is transparently an instance of 'don't import from another module', which the OLD skill already states. There is no reasoning leap for the model to miss. A rule only produces a recall gap when (a) there is NO general principle in the base skill that subsumes it, or (b) the case actively looks fine under the base skill's framing. `import type` fails both — §7 subsumes it and it looks like exactly what §7 forbids.",
+  "what_would_produce_a_recall_gap": [
+    "A rule with no parent principle in the base skill — e.g. a repo-specific invariant like 'a job body must be a service method, never inline in JobRunner' or 'INJECTION_GUARD is never made conditional' — where the base skill genuinely says nothing and the model has no way to infer it.",
+    "A case that looks correct under the base skill — e.g. code that passes every stated rule but violates an unstated one; the base-skill reviewer concludes 'clean' and the new-skill reviewer catches the one thing.",
+    "Restricting the baseline: run the OLD-skill agent with NO access to the real repo (cold review). Then it cannot read `.dependency-cruiser.cjs` / sibling modules / the container comments that let it generalise. This is the honest test of what the skill body alone carries — and the scenario where skill content matters most."
+  ]
+}

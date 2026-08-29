@@ -1,0 +1,12 @@
+[mcp_servers.devdigest]
+command = "pnpm"
+args = [
+    "--dir",
+    "mcp",
+    "exec",
+    "tsx",
+    "src/server.ts",
+]
+
+[mcp_servers.devdigest.env]
+DEVDIGEST_API_URL = "http://localhost:3001"

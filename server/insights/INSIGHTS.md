@@ -96,6 +96,15 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   actually survived. Wrap the optional work in your own try/catch and report the
   failure with `runLog.info(...)` — the pattern `buildCallersDigest` /
   `buildRepoMapDigest` / the intent step in `reviews/run-executor.ts` already use.
+- **2026-08-28** — A body-less Fastify `POST` reaches the
+  `fastify-type-provider-zod` body validator as `null`, so a route that supports
+  both no payload and an object payload (for example `modules/brief/routes.ts`)
+  must declare its body schema with `.nullish()`: `.optional()` alone rejects the
+  no-payload form with the app's validation `422`.
+- **2026-08-28** — `agent_runs.status = 'done'` is a completion boundary for
+  pollers: once they observe it, they immediately request the run trace. Persist
+  `run_traces` before publishing `done` in `reviews/run-executor.ts`; the inverse
+  order creates a real race where a completed run temporarily has no trace.
 
 ## Recurring Errors & Fixes
 
@@ -105,6 +114,8 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   fails every route in the app with `container.repoIntel.registerIndexJobHandlers
   is not a function` at `buildApp` time — the failure names repo-intel and points
   at boot, which reads like an app bug rather than a test-double gap.
+
+- **2026-08-27** — `arch:check`/`arch:ratchet` only cruise `src` (+ `../reviewer-core/src`), not `server/test/` — every existing `*.it.test.ts` lives in `server/test/` for exactly this reason. A test file placed inside `src/modules/<name>/` instead (e.g. because a Development Plan named that path literally) trips real, new violations the moment it needs a DB row type or a sibling module's port: `repository-owns-persistence` on `import * as schema from '../../db/schema.js'`, and `no-cross-module-imports` on importing another module's `service.ts`/`repository.ts` to build a fake. Fix is to move the file to `server/test/` (adjusting relative imports), not to bless the violation in the ratchet baseline. If the test only needs a row *type* (not the schema module itself), add it to `src/db/rows.ts` instead — that file is explicitly exempt from `repository-owns-persistence` and already exists so cross-cutting consumers can reference a row shape without importing `db/schema.ts`.
 
 ## Session Notes
 

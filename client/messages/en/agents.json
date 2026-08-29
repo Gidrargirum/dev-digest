@@ -46,6 +46,7 @@
     "tabs": {
       "config": "Config",
       "skills": "Skills",
+      "context": "Context",
       "evals": "Evals",
       "stats": "Stats",
       "ci": "CI"
@@ -101,6 +102,30 @@
     "moveDown": "Move {name} down",
     "emptyCatalog": "No skills yet. Create one on the Skills page.",
     "goToSkills": "Go to Skills"
+  },
+  "context": {
+    "title": "Project Context",
+    "hint": "Attach repository .md documents from Project Context. They're inserted into the prompt as untrusted context — order matters.",
+    "attachedCount": "{attached} of {total} attached",
+    "tokenEstimate": "≈ {count} tokens",
+    "filterPlaceholder": "Filter documents…",
+    "emptyCatalog": "No documents found for this repository. Visit Project Context to check the repo's clone status.",
+    "moveUp": "Move {name} up",
+    "moveDown": "Move {name} down",
+    "detach": "Detach",
+    "broken": "broken",
+    "inheritedTitle": "Inherited from skills",
+    "fromSkill": "from skill {name}",
+    "save": "Save context",
+    "saving": "Saving…",
+    "saved": "Context saved",
+    "savedToast": "Context saved",
+    "tokensShort": "{count}t",
+    "preview": "Preview",
+    "previewClose": "Close preview",
+    "previewPanel": "Document preview",
+    "previewError": "Couldn’t load this document",
+    "dragHandle": "Reorder {name} — drag, or use arrow keys"
   },
   "mount": {
     "body": "Mount point for {owner}. The Agent Editor shell + tab routing are wired by A2 — {owner} renders this tab."
