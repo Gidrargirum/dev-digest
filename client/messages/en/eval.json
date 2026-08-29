@@ -12,7 +12,8 @@
     "metrics": {
       "recall": "RECALL",
       "precision": "PRECISION",
-      "citationAccuracy": "CITATION ACCURACY"
+      "citationAccuracy": "CITATION ACCURACY",
+      "tracesPassed": "TRACES PASSED"
     },
     "legend": {
       "recall": "Recall",
@@ -50,7 +51,10 @@
     "bodyLabel": "Body",
     "bodyPlaceholder": "Wire up payments via Stripe SDK.",
     "preview": "Preview",
+    "expectationTypeLabel": "Expectation type",
     "expectedOutput": "Expected output",
+    "actualOutputLabel": "Actual output",
+    "neverRun": "Never run yet",
     "validJson": "valid JSON",
     "invalidJson": "invalid JSON",
     "lastRunPassed": "Last run passed",
@@ -71,7 +75,8 @@
     "run": "Run",
     "running": "Running…",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "confirmDelete": "Delete this eval case?"
   },
   "page": {
     "crumbSkillsLab": "Skills Lab",
@@ -80,5 +85,30 @@
     "crumbEvals": "Evals",
     "crumbNewCase": "New case",
     "crumbEvalCase": "Eval case"
+  },
+  "findingCard": {
+    "turnIntoEvalCase": "Turn into eval case",
+    "turnIntoEvalCaseDisabled": "Accept or dismiss this finding first — the eval case's expectation type is derived from that decision."
+  },
+  "compare": {
+    "title": "Compare runs",
+    "subtitle": "{a} vs {b}",
+    "recall": "Recall",
+    "precision": "Precision",
+    "citationAccuracy": "Citation accuracy",
+    "cost": "Cost",
+    "systemPromptDiff": "System prompt diff",
+    "compareAction": "Compare",
+    "promote": "Promote",
+    "promoting": "Promoting…",
+    "promoted": "Promoted v{version} onto the agent",
+    "close": "Close"
+  },
+  "banner": {
+    "precisionRegression": "Precision dropped {delta} vs. the previous run"
+  },
+  "errors": {
+    "unreachable": "Cannot reach the DevDigest engine. Is the API running?",
+    "notFound": "Not found."
   }
 }

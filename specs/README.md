@@ -12,6 +12,7 @@ for features touching more than one package. Normative voice — "must",
 | [blast-radius.md](./blast-radius.md) | Impact map for a PR's diff — changed symbols, callers, and reachable HTTP endpoints/crons, surfaced via a route, a client tab, and an MCP tool |
 | [2026-08-26-project-context-folder.md](./2026-08-26-project-context-folder.md) | Attaching repo `.md` docs to agents/skills by hand, injecting them as untrusted `## Project context`, and showing them in the run trace (read/attach path; partially superseded below) |
 | [2026-08-27-project-context-folder-authoring.md](./2026-08-27-project-context-folder-authoring.md) | Authoring the Project Context folder — file tree, create/upload/edit `.md` documents, DB-backed persistence, and the COVERAGE indicator; supersedes the base spec's read-only Non-goals |
+| [2026-08-29-eval-pipeline.md](./2026-08-29-eval-pipeline.md) | Eval Pipeline — eval cases seeded from accepted/dismissed findings, a batch replay of an agent over its frozen gold set, code-only recall/precision/citation scoring, the Evals tab, the Eval Dashboard and run comparison |
 | [2026-08-28-pr-brief.md](./2026-08-28-pr-brief.md) | PR Brief — one cached LLM call on review-run completion, fusing intent, blast radius and diff stats into what/why/risk_level/risks/review_focus, rendered as three Overview blocks with deep links into the diff; partially supersedes `pr-intent-layer.md`'s `risk_areas` |
 
 ## What belongs here

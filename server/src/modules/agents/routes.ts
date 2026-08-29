@@ -68,6 +68,8 @@ const SetSkillsBody = z
     message: 'Provide skill_ids (set/reorder) or skill_id (link one)',
   });
 
+const PromoteAgentBody = z.object({ version: z.number().int().positive() });
+
 const ToggleSkillLinkBody = z.object({ enabled: z.boolean() });
 const AgentSkillParams = z.object({ id: z.string().uuid(), skillId: z.string().uuid() });
 
@@ -117,6 +119,21 @@ export default async function agentsRoutes(appBase: FastifyInstance) {
       const { workspaceId } = await getContext(app.container, req);
       const agent = await service.update(workspaceId, req.params.id, req.body);
       if (!agent) throw new NotFoundError('Agent not found');
+      return agent;
+    },
+  );
+
+  // Promote a past config snapshot to current (AC-29). Same plugin as
+  // PUT /agents/:id (decision locked) so it inherits identical authorization
+  // — the only placement with no `no-cross-module-imports` conflict, since
+  // `modules/eval` may not import `modules/agents/service.ts`.
+  app.post(
+    '/agents/:id/promote',
+    { schema: { params: IdParams, body: PromoteAgentBody } },
+    async (req) => {
+      const { workspaceId } = await getContext(app.container, req);
+      const agent = await service.promoteVersion(workspaceId, req.params.id, req.body.version);
+      if (!agent) throw new NotFoundError('Agent or version not found');
       return agent;
     },
   );

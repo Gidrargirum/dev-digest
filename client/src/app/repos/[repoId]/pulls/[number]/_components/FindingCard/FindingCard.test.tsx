@@ -3,6 +3,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import type { FindingRecord } from "@devdigest/shared";
 import messages from "../../../../../../../../messages/en/prReview.json";
+import evalMessages from "../../../../../../../../messages/en/eval.json";
 import { FindingCard } from "./FindingCard";
 
 afterEach(cleanup);
@@ -28,7 +29,7 @@ const FINDING: FindingRecord = {
 
 function renderWithIntl(ui: React.ReactElement) {
   return render(
-    <NextIntlClientProvider locale="en" messages={{ prReview: messages }}>
+    <NextIntlClientProvider locale="en" messages={{ prReview: messages, eval: evalMessages }}>
       {ui}
     </NextIntlClientProvider>,
   );
@@ -56,5 +57,54 @@ describe("FindingCard (smoke, both themes)", () => {
     expect(onAction).toHaveBeenCalledWith("accept");
     fireEvent.click(screen.getByText("Dismiss"));
     expect(onAction).toHaveBeenCalledWith("dismiss");
+  });
+
+  it("keeps 'Turn into eval case' disabled until the finding is triaged, then fires it once accepted (AC-1–AC-4)", () => {
+    const onTurnIntoEvalCase = vi.fn();
+    const { rerender } = renderWithIntl(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages, eval: evalMessages }}>
+        <FindingCard f={FINDING} defaultExpanded onAction={() => {}} onTurnIntoEvalCase={onTurnIntoEvalCase} />
+      </NextIntlClientProvider>,
+    );
+
+    // AC-1: the action is rendered alongside Accept/Dismiss.
+    const turnBtn = screen.getByRole("button", { name: "Turn into eval case" });
+    expect(turnBtn).toBeInTheDocument();
+    // AC-4: untriaged (neither accepted_at nor dismissed_at) keeps it disabled,
+    // with an explanation.
+    expect(turnBtn).toBeDisabled();
+    expect(turnBtn).toHaveAttribute(
+      "title",
+      "Accept or dismiss this finding first — the eval case's expectation type is derived from that decision.",
+    );
+
+    // AC-2: an accepted finding enables the action and fires the handler.
+    rerender(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages, eval: evalMessages }}>
+        <FindingCard
+          f={{ ...FINDING, accepted_at: "2026-08-29T00:00:00Z" }}
+          defaultExpanded
+          onAction={() => {}}
+          onTurnIntoEvalCase={onTurnIntoEvalCase}
+        />
+      </NextIntlClientProvider>,
+    );
+    const enabledBtn = screen.getByRole("button", { name: "Turn into eval case" });
+    expect(enabledBtn).toBeEnabled();
+    fireEvent.click(enabledBtn);
+    expect(onTurnIntoEvalCase).toHaveBeenCalledTimes(1);
+
+    // AC-3: a dismissed finding also enables the action.
+    rerender(
+      <NextIntlClientProvider locale="en" messages={{ prReview: messages, eval: evalMessages }}>
+        <FindingCard
+          f={{ ...FINDING, dismissed_at: "2026-08-29T00:00:00Z" }}
+          defaultExpanded
+          onAction={() => {}}
+          onTurnIntoEvalCase={onTurnIntoEvalCase}
+        />
+      </NextIntlClientProvider>,
+    );
+    expect(screen.getByRole("button", { name: "Turn into eval case" })).toBeEnabled();
   });
 });

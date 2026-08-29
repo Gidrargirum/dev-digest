@@ -1,6 +1,14 @@
 import { z } from 'zod';
 import { Verdict, Finding } from './findings.js';
-import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowledge.js';
+import {
+  EvalRun,
+  EvalOwnerKind,
+  EvalExpectationType,
+  EvalExpectedFinding,
+  Conformance,
+  Provider,
+  CiFailOn,
+} from './knowledge.js';
 
 /**
  * A4 — Eval / CI / Compose / Conformance API contracts (L06).
@@ -17,16 +25,47 @@ import { EvalRun, EvalOwnerKind, Conformance, Provider, CiFailOn } from './knowl
 // ===========================================================================
 
 /** Create/update payload for an eval case (id + owner resolved by the route). */
-export const EvalCaseInput = z.object({
+/**
+ * Base object shape — kept separate from `EvalCaseInput` (below) because
+ * `.superRefine()` returns a `ZodEffects`, which has no `.partial()`.
+ * `modules/eval/routes.ts` builds its PUT/patch body from THIS shape, then
+ * re-applies `refineMustNotFlagExpectedOutput` itself so a partial update
+ * still gets the same cross-field check whenever both fields are present.
+ */
+export const EvalCaseInputShape = z.object({
+  // Non-goal: `owner_kind` is constrained to 'agent' at the route level (an
+  // EvalOwnerKind of 'skill' is rejected with 400) — see modules/eval/routes.ts.
   owner_kind: EvalOwnerKind,
   owner_id: z.string(),
   name: z.string().min(1),
   input_diff: z.string().default(''),
   input_files: z.unknown().nullish(),
   input_meta: z.unknown().nullish(),
-  expected_output: z.unknown(),
+  expectation_type: EvalExpectationType,
+  expected_output: z.array(EvalExpectedFinding),
   notes: z.string().nullish(),
 });
+
+/**
+ * A `must_not_flag` case expects ZERO findings on its input (AC-21) — a
+ * non-empty `expected_output` would contradict that and is rejected.
+ * Exported so a partial (PATCH-style) schema built from `EvalCaseInputShape`
+ * can apply the same rule via its own `.superRefine()` call.
+ */
+export function refineMustNotFlagExpectedOutput(
+  val: { expectation_type?: EvalExpectationType | undefined; expected_output?: EvalExpectedFinding[] | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  if (val.expectation_type === 'must_not_flag' && val.expected_output && val.expected_output.length > 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['expected_output'],
+      message: 'expected_output must be empty when expectation_type is "must_not_flag"',
+    });
+  }
+}
+
+export const EvalCaseInput = EvalCaseInputShape.superRefine(refineMustNotFlagExpectedOutput);
 export type EvalCaseInput = z.infer<typeof EvalCaseInput>;
 
 /** A persisted eval run row (one execution of a case), returned by the API. */
@@ -34,6 +73,7 @@ export const EvalRunRecord = z.object({
   id: z.string(),
   case_id: z.string(),
   case_name: z.string().nullish(),
+  batch_id: z.string(),
   ran_at: z.string(),
   actual_output: z.unknown(),
   pass: z.boolean().nullable(),
@@ -42,8 +82,52 @@ export const EvalRunRecord = z.object({
   citation_accuracy: z.number().nullable(),
   duration_ms: z.number().int().nullable(),
   cost_usd: z.number().nullable(),
+  // Detail view (AC-24/AC-25), so a failing case is diagnosable without
+  // re-reading the raw output. `matched` — expectations that found a
+  // matching produced finding. `unmatched` — expectations that found NO
+  // matching finding PLUS any produced findings that matched no expectation
+  // (false positives), both mapped onto the shared `EvalExpectedFinding`
+  // shape (file/lines/severity/category/title) so the client can render
+  // them uniformly regardless of which side they came from.
+  matched: z.array(EvalExpectedFinding),
+  unmatched: z.array(EvalExpectedFinding),
 });
 export type EvalRunRecord = z.infer<typeof EvalRunRecord>;
+
+export const EvalBatchStatus = z.enum(['running', 'done', 'failed', 'cancelled']);
+export type EvalBatchStatus = z.infer<typeof EvalBatchStatus>;
+
+/** A persisted eval batch (mirrors `eval_batches`) — one `POST /agents/:id/eval-runs`. */
+export const EvalBatch = z.object({
+  id: z.string(),
+  agent_id: z.string(),
+  agent_version: z.number().int(),
+  status: EvalBatchStatus,
+  started_at: z.string(),
+  finished_at: z.string().nullable(),
+  cases_total: z.number().int(),
+  cases_passed: z.number().int(),
+  recall: z.number().nullable(),
+  precision: z.number().nullable(),
+  citation_accuracy: z.number().nullable(),
+  no_flag_rate: z.number().nullable(),
+  cost_usd: z.number().nullable(),
+  duration_ms: z.number().int().nullable(),
+});
+export type EvalBatch = z.infer<typeof EvalBatch>;
+
+/** What `POST /agents/:id/eval-runs` returns immediately (AC-12, Responsiveness). */
+export const EvalBatchStarted = z.object({
+  batch_id: z.string(),
+});
+export type EvalBatchStarted = z.infer<typeof EvalBatchStarted>;
+
+/** A batch + its per-case run detail (`GET /eval-runs/:batchId`). */
+export const EvalBatchDetail = z.object({
+  batch: EvalBatch,
+  runs: z.array(EvalRunRecord),
+});
+export type EvalBatchDetail = z.infer<typeof EvalBatchDetail>;
 
 /** Result of running a single case: the metrics (EvalRun) + the persisted row id. */
 export const EvalRunResult = z.object({
@@ -53,38 +137,41 @@ export const EvalRunResult = z.object({
 });
 export type EvalRunResult = z.infer<typeof EvalRunResult>;
 
-/** One point on the dashboard trend (per run, chronological). */
-export const EvalTrendPoint = z.object({
-  ran_at: z.string(),
-  recall: z.number(),
-  precision: z.number(),
-  citation_accuracy: z.number(),
-  pass_rate: z.number(),
-  cost_usd: z.number().nullable(),
+/**
+ * One row of the dashboard's agent list (AC-31): every agent in the
+ * workspace gets an entry, whether or not it has ever run a batch —
+ * `latest_batch` is `null` for an agent with no batches yet, and the client
+ * renders "Configure eval cases →" for it instead of metrics.
+ */
+export const EvalDashboardAgent = z.object({
+  agent_id: z.string(),
+  agent_name: z.string(),
+  agent_model: z.string(),
+  latest_batch: EvalBatch.nullable(),
 });
-export type EvalTrendPoint = z.infer<typeof EvalTrendPoint>;
+export type EvalDashboardAgent = z.infer<typeof EvalDashboardAgent>;
 
-/** Aggregate dashboard for an owner (agent/skill) or the whole workspace. */
+/**
+ * One row of the dashboard's `Recent runs` table (AC-32): an `EvalRunRecord`
+ * plus which agent + agent version it belongs to — the table spans every
+ * agent in the workspace, so the row needs to name its agent explicitly
+ * (unlike `EvalBatchDetail.runs`, which is already scoped to one agent).
+ */
+export const EvalDashboardRun = EvalRunRecord.extend({
+  agent_id: z.string(),
+  agent_name: z.string(),
+  agent_version: z.number().int(),
+});
+export type EvalDashboardRun = z.infer<typeof EvalDashboardRun>;
+
+/**
+ * Workspace-wide dashboard (`GET /evals/dashboard`, AC-31/AC-32): every
+ * agent in the workspace with its latest batch (or `null` if it has never
+ * run one) — plus the most recent runs across the whole workspace.
+ */
 export const EvalDashboard = z.object({
-  owner_kind: EvalOwnerKind.nullable(),
-  owner_id: z.string().nullable(),
-  cases_total: z.number().int(),
-  current: z.object({
-    recall: z.number(),
-    precision: z.number(),
-    citation_accuracy: z.number(),
-    traces_passed: z.number().int(),
-    traces_total: z.number().int(),
-    cost_usd: z.number().nullable(),
-  }),
-  delta: z.object({
-    recall: z.number(),
-    precision: z.number(),
-    citation_accuracy: z.number(),
-  }),
-  trend: z.array(EvalTrendPoint),
-  recent_runs: z.array(EvalRunRecord),
-  alert: z.string().nullable(),
+  agents: z.array(EvalDashboardAgent),
+  recent_runs: z.array(EvalDashboardRun),
 });
 export type EvalDashboard = z.infer<typeof EvalDashboard>;
 

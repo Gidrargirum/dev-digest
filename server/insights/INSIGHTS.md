@@ -42,6 +42,12 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
 - A rule scoped `from: ^src/(adapters|platform)/` to `^src/modules/` fires 5× on
   `platform/container.ts` alone. The composition root is entry ring, not
   infrastructure — exempt it by path or the rule is unlandable.
+- **2026-08-29** — Any new execution path that calls `reviewPullRequest`
+  (e.g. `modules/eval/batch-executor.ts`) must resolve and pass the agent's
+  linked `skills` (resolved skill bodies), the same way
+  `reviews/run-executor.ts`'s `buildSkillBodies` does — passing only
+  `systemPrompt` silently runs the review without the agent's configured
+  skills; nothing errors or warns, it just quietly changes what got reviewed.
 
 ## Tool & Library Notes
 
@@ -105,6 +111,19 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   pollers: once they observe it, they immediately request the run trace. Persist
   `run_traces` before publishing `done` in `reviews/run-executor.ts`; the inverse
   order creates a real race where a completed run temporarily has no trace.
+- **2026-08-29** — `.dependency-cruiser.cjs`'s `service-not-in-adapters` rule
+  only matches files literally named `service.ts`
+  (`from: { path: 'src/modules/[^/]+/service\.ts$' }`) — a same-module file
+  with a different name (e.g. `batch-executor.ts`, `reviews/diff-loader.ts`)
+  that imports `adapters/**` directly is invisible to `arch:check`/
+  `arch:ratchet`, not even a `warn`. Two files now rely on this gap; treat it
+  as a real enforcement hole to check by eye, not a rule you can trust to
+  catch adapter leakage outside `service.ts`.
+- **2026-08-29** — Every Zod route-schema validation failure maps to HTTP
+  `422` app-wide (`src/app.ts`'s global error handler), never `400` — this
+  applies uniformly, not just the body-less-POST case noted above. A spec/AC
+  that says "reject with 400" for a malformed request body is wrong for this
+  codebase; write the assertion (and the AC) as `422`.
 
 ## Recurring Errors & Fixes
 
@@ -116,6 +135,22 @@ Maintained by the `engineering-insights` skill; see ../AGENTS.md for layer rules
   at boot, which reads like an app bug rather than a test-double gap.
 
 - **2026-08-27** — `arch:check`/`arch:ratchet` only cruise `src` (+ `../reviewer-core/src`), not `server/test/` — every existing `*.it.test.ts` lives in `server/test/` for exactly this reason. A test file placed inside `src/modules/<name>/` instead (e.g. because a Development Plan named that path literally) trips real, new violations the moment it needs a DB row type or a sibling module's port: `repository-owns-persistence` on `import * as schema from '../../db/schema.js'`, and `no-cross-module-imports` on importing another module's `service.ts`/`repository.ts` to build a fake. Fix is to move the file to `server/test/` (adjusting relative imports), not to bless the violation in the ratchet baseline. If the test only needs a row *type* (not the schema module itself), add it to `src/db/rows.ts` instead — that file is explicitly exempt from `repository-owns-persistence` and already exists so cross-cutting consumers can reference a row shape without importing `db/schema.ts`.
+
+- **2026-08-29** — `src/db/seed.ts`'s PR #482 review was originally inserted
+  with no `agentId` (agents are seeded later in the same `seed()`). Any
+  client feature that gates on `review.agent_id` being truthy (e.g.
+  `FindingsPanel`'s `Turn into eval case` button) is then unreachable through
+  the seeded UI/e2e path regardless of triage state — not a bug in the
+  feature, a gap in the seed. Fixed with a post-agent-creation idempotent
+  `UPDATE reviews SET agent_id = ... WHERE pr_id = ...` backfill. Check this
+  whenever a new feature reads `agent_id` off a seeded review.
+- **2026-08-29** — A repository method that finds "latest related row per
+  parent" via a join keyed off the *related* table (e.g. `evalBatches` →
+  latest per `agent_id`) silently drops every parent with zero related rows
+  — an agent with no eval batches never appeared in the dashboard list. When
+  a spec requires listing every parent regardless of whether related data
+  exists, query parents and related rows separately and merge in memory (or
+  use a `LEFT JOIN`), not a join anchored on the child table.
 
 ## Session Notes
 
