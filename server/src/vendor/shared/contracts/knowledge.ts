@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Severity, FindingCategory } from './findings.js';
 
 /**
  * Conformance, Onboarding, Eval, Memory, Conventions, Skills,
@@ -55,10 +56,35 @@ export const EvalPerTrace = z.object({
 });
 export type EvalPerTrace = z.infer<typeof EvalPerTrace>;
 
+/**
+ * `must_find` — the case expects the agent to surface >=1 matching finding
+ * (contributes to recall). `must_not_flag` — the case expects ZERO findings on
+ * this input; any produced finding is a false positive (contributes to
+ * `no_flag_rate`, never to recall/precision denominators — AC-21).
+ */
+export const EvalExpectationType = z.enum(['must_find', 'must_not_flag']);
+export type EvalExpectationType = z.infer<typeof EvalExpectationType>;
+
+/** One finding the case expects (or, for `must_not_flag`, must NOT produce). */
+export const EvalExpectedFinding = z.object({
+  file: z.string(),
+  start_line: z.number().int(),
+  end_line: z.number().int(),
+  severity: Severity,
+  category: FindingCategory,
+  title: z.string(),
+});
+export type EvalExpectedFinding = z.infer<typeof EvalExpectedFinding>;
+
 export const EvalRun = z.object({
-  recall: z.number().min(0).max(1),
-  precision: z.number().min(0).max(1),
-  citation_accuracy: z.number().min(0).max(1),
+  // Nullable (AC-22): a zero denominator (e.g. a must_not_flag case has no
+  // recall denominator) is `null`, never substituted with 0 or 1.
+  recall: z.number().min(0).max(1).nullable(),
+  precision: z.number().min(0).max(1).nullable(),
+  citation_accuracy: z.number().min(0).max(1).nullable(),
+  // False-positive rate over must_not_flag cases (AC-24) — API-only, never a
+  // fifth metric card in the dashboard UI.
+  no_flag_rate: z.number().min(0).max(1).nullable(),
   traces_passed: z.number().int(),
   traces_total: z.number().int(),
   duration_ms: z.number().int(),
@@ -70,17 +96,37 @@ export type EvalRun = z.infer<typeof EvalRun>;
 export const EvalOwnerKind = z.enum(['skill', 'agent']);
 export type EvalOwnerKind = z.infer<typeof EvalOwnerKind>;
 
-export const EvalCase = z.object({
-  id: z.string(),
-  owner_kind: EvalOwnerKind,
-  owner_id: z.string(),
-  name: z.string(),
-  input_diff: z.string(),
-  input_files: z.unknown(),
-  input_meta: z.unknown(),
-  expected_output: z.unknown(),
-  notes: z.string().nullish(),
-});
+export const EvalCase = z
+  .object({
+    id: z.string(),
+    owner_kind: EvalOwnerKind,
+    owner_id: z.string(),
+    // The baseline agent whose provider/model/system_prompt/remaining skills
+    // supply both passes of a skill-owned case's execution (Amendment A,
+    // AC-38). Required (in practice, enforced by the service — see
+    // `EvalCaseInputShape` in `eval-ci.ts`) when `owner_kind = 'skill'`;
+    // meaningless and left `null` for `owner_kind = 'agent'`. Chosen by the
+    // user in the case editor, never auto-inferred from `agent_skills`.
+    baseline_agent_id: z.string().uuid().nullish(),
+    name: z.string(),
+    input_diff: z.string(),
+    input_files: z.unknown(),
+    input_meta: z.unknown(),
+    expectation_type: EvalExpectationType,
+    expected_output: z.array(EvalExpectedFinding),
+    notes: z.string().nullish(),
+  })
+  .superRefine((val, ctx) => {
+    // A `must_not_flag` case expects ZERO findings on its input (AC-21) — a
+    // non-empty `expected_output` would contradict that and is rejected.
+    if (val.expectation_type === 'must_not_flag' && val.expected_output.length > 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['expected_output'],
+        message: 'expected_output must be empty when expectation_type is "must_not_flag"',
+      });
+    }
+  });
 export type EvalCase = z.infer<typeof EvalCase>;
 
 // ---- Memory ----

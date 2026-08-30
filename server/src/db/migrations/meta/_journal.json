@@ -141,6 +141,27 @@
       "when": 1787904495672,
       "tag": "0019_brief_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1788010504509,
+      "tag": "0020_famous_black_cat",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788024090279,
+      "tag": "0021_productive_franklin_richards",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1788038491262,
+      "tag": "0022_broad_gwen_stacy",
+      "breakpoints": true
     }
   ]
 }

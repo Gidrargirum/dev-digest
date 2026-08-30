@@ -13,6 +13,7 @@ import intent from './intent/routes.js';
 import blast from './blast/routes.js';
 import brief from './brief/routes.js';
 import context from './context/routes.js';
+import evalModule from './eval/routes.js';
 
 /**
  * Module registry. Each feature module is a Fastify plugin in
@@ -42,4 +43,5 @@ export const modules: Record<string, FastifyPluginAsync> = {
   blast,
   brief,
   context,
+  eval: evalModule,
 };

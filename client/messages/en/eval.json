@@ -1,6 +1,13 @@
 {
   "dashboard": {
     "defaultTitle": "Eval Dashboard",
+    "subtitle": "Regression harness across all reviewer agents · pick an agent to see its runs",
+    "agentsSectionTitle": "Agents",
+    "recentRunsAllAgents": "Recent eval runs · all agents",
+    "runAllAgents": "Run all agents",
+    "confirmRunAll": "Run every agent's eval cases? This can trigger many provider calls.",
+    "runAllStarted": "Started eval runs for every agent with cases",
+    "lastRunSummary": "Last run v{version} · {date} · {passed}/{total} pass",
     "loading": "Loading eval metrics…",
     "casesSummary": "{count, plural, one {# eval case} other {# eval cases}} · gold set · {runs, plural, one {# run} other {# runs}}",
     "configure": "Configure eval cases →",
@@ -12,7 +19,8 @@
     "metrics": {
       "recall": "RECALL",
       "precision": "PRECISION",
-      "citationAccuracy": "CITATION ACCURACY"
+      "citationAccuracy": "CITATION ACCURACY",
+      "tracesPassed": "TRACES PASSED"
     },
     "legend": {
       "recall": "Recall",
@@ -20,7 +28,10 @@
       "citation": "Citation"
     },
     "table": {
+      "agent": "Agent",
+      "case": "Case",
       "ranAt": "Ran at",
+      "version": "Version",
       "recall": "Recall",
       "precision": "Precision",
       "citation": "Citation",
@@ -35,6 +46,8 @@
     "caseTitle": "Eval case · {name}",
     "runCase": "Run case",
     "running": "Running…",
+    "runOnSave": "Run on save",
+    "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving…",
     "nameLabel": "Name",
@@ -50,12 +63,24 @@
     "bodyLabel": "Body",
     "bodyPlaceholder": "Wire up payments via Stripe SDK.",
     "preview": "Preview",
+    "expectationTypeLabel": "Expectation type",
     "expectedOutput": "Expected output",
+    "actualOutputLabel": "Actual output",
+    "neverRun": "Never run yet",
     "validJson": "valid JSON",
     "invalidJson": "invalid JSON",
     "lastRunPassed": "Last run passed",
     "lastRunFailed": "Last run failed",
-    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s"
+    "runStatusLine": "{passed}/{total} passed · {duration}s · ${cost}",
+    "resultSummary": "recall {recall}% · precision {precision}% · citation {citation}% · {duration}s",
+    "baselineAgentLabel": "Baseline agent",
+    "baselineAgentPlaceholder": "Select an agent…",
+    "skillCostWarning": "A skill batch runs each case twice — with and without the skill — so it costs roughly twice an agent batch of the same case count.",
+    "withSkill": "With skill",
+    "withoutSkill": "Without skill",
+    "marginalEffect": "Marginal effect — recall {recall} · precision {precision} · citation {citation}",
+    "passFailed": "This pass failed: {error}",
+    "passSummary": "recall {recall}% · precision {precision}% · citation {citation}%"
   },
   "evalsTab": {
     "metricsTitle": "Eval metrics",
@@ -71,7 +96,8 @@
     "run": "Run",
     "running": "Running…",
     "edit": "Edit",
-    "delete": "Delete"
+    "delete": "Delete",
+    "confirmDelete": "Delete this eval case?"
   },
   "page": {
     "crumbSkillsLab": "Skills Lab",
@@ -80,5 +106,30 @@
     "crumbEvals": "Evals",
     "crumbNewCase": "New case",
     "crumbEvalCase": "Eval case"
+  },
+  "findingCard": {
+    "turnIntoEvalCase": "Turn into eval case",
+    "turnIntoEvalCaseDisabled": "Accept or dismiss this finding first — the eval case's expectation type is derived from that decision."
+  },
+  "compare": {
+    "title": "Compare runs",
+    "subtitle": "{a} vs {b}",
+    "recall": "Recall",
+    "precision": "Precision",
+    "citationAccuracy": "Citation accuracy",
+    "cost": "Cost",
+    "systemPromptDiff": "System prompt diff",
+    "compareAction": "Compare",
+    "promote": "Promote",
+    "promoting": "Promoting…",
+    "promoted": "Promoted v{version} onto the agent",
+    "close": "Close"
+  },
+  "banner": {
+    "precisionRegression": "Precision dropped {delta} vs. the previous run"
+  },
+  "errors": {
+    "unreachable": "Cannot reach the DevDigest engine. Is the API running?",
+    "notFound": "Not found."
   }
 }

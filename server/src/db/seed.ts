@@ -13,6 +13,7 @@ import {
   TEST_QUALITY_REVIEWER_PROMPT,
   API_CONTRACT_REVIEWER_PROMPT,
 } from './seed-skills.js';
+import { SEED_EVAL_CASES, SEED_SKILL_EVAL_CASES } from './seed-eval-cases.js';
 
 /** Default provider/model for the built-in reviewer agents. */
 const DEFAULT_PROVIDER = 'openrouter' as const;
@@ -24,6 +25,18 @@ const DEFAULT_MODEL = 'deepseek/deepseek-v4-flash';
  * every `skillName` here actually exists in `SEED_SKILLS` without touching
  * Postgres.
  */
+/**
+ * Amendment A (AC-61) — the skill measured by `SEED_SKILL_EVAL_CASES`, and
+ * the baseline agent it must already be linked and enabled on (see
+ * `AGENT_SKILL_LINKS` below) — `verify:l06`'s skill-batch check needs a real,
+ * already-wired `agent_skills` link, not just a skill/agent pair that
+ * happens to exist.
+ */
+export const SKILL_EVAL_OWNER = {
+  skillName: 'test-quality-rubric',
+  baselineAgentName: 'Test Quality Reviewer',
+} as const;
+
 export const AGENT_SKILL_LINKS: Array<{ agentName: string; skillName: string; order: number }> = [
   { agentName: 'Test Quality Reviewer', skillName: 'test-quality-rubric', order: 0 },
   { agentName: 'Test Quality Reviewer', skillName: 'pr-quality-rubric', order: 1 },
@@ -261,7 +274,27 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
       .select()
       .from(t.agents)
       .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, a.name)));
-    if (!existing) await db.insert(t.agents).values(a);
+    if (!existing) {
+      // Mirrors AgentsRepository.insert's version-snapshot pattern: insert
+      // the agent row, then snapshot version 1 into agent_versions. Skipping
+      // this left seeded agents with no row to promote or diff against
+      // (Promote / Compare runs both 404'd on "Agent or version not found").
+      const [inserted] = await db.insert(t.agents).values(a).returning();
+      await db.insert(t.agentVersions).values({
+        agentId: inserted!.id,
+        version: 1,
+        configJson: {
+          provider: inserted!.provider,
+          model: inserted!.model,
+          system_prompt: inserted!.systemPrompt,
+          output_schema: inserted!.outputSchema,
+          strategy: inserted!.strategy,
+          ci_fail_on: inserted!.ciFailOn,
+          repo_intel: inserted!.repoIntel,
+          skills: [],
+        },
+      });
+    }
   }
 
   // ---- community skills catalog (global, no workspace scope) ----
@@ -333,6 +366,92 @@ export async function seed(db: Db): Promise<{ workspaceId: string; userId: strin
         .insert(t.agentSkills)
         .values({ agentId: agent.id, skillId: skill.id, order: link.order, enabled: true })
         .onConflictDoNothing();
+    }
+  }
+
+  // ---- backfill agent_id on the seeded PR #482 review ----
+  // The review is inserted earlier (before agents exist), so it starts with a
+  // null agent_id. Attach it to General Reviewer now that the agent row
+  // exists — findings on a review with no agent can never be turned into an
+  // eval case from the UI (FindingsPanel only wires up the action when
+  // `agentId` is truthy). Idempotent: re-running always sets the same value.
+  const [generalReviewer] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, 'General Reviewer')));
+  if (generalReviewer) {
+    await db
+      .update(t.reviews)
+      .set({ agentId: generalReviewer.id })
+      .where(eq(t.reviews.prId, pr!.id));
+  }
+
+  // ---- eval cases (L06) — demo cases for the General Reviewer agent ----
+  if (generalReviewer) {
+    for (const def of SEED_EVAL_CASES) {
+      const [existing] = await db
+        .select()
+        .from(t.evalCases)
+        .where(
+          and(
+            eq(t.evalCases.workspaceId, workspaceId),
+            eq(t.evalCases.ownerKind, 'agent'),
+            eq(t.evalCases.ownerId, generalReviewer.id),
+            eq(t.evalCases.name, def.name),
+          ),
+        );
+      if (!existing) {
+        await db.insert(t.evalCases).values({
+          workspaceId,
+          ownerKind: 'agent',
+          ownerId: generalReviewer.id,
+          name: def.name,
+          inputDiff: def.inputDiff,
+          expectationType: def.expectationType,
+          expectedOutput: def.expectedOutput,
+          notes: def.notes,
+        });
+      }
+    }
+  }
+
+  // ---- skill-owned eval cases (Amendment A, AC-61) ----
+  // Measured against SKILL_EVAL_OWNER.baselineAgentName, which is already
+  // linked+enabled on the skill via AGENT_SKILL_LINKS above.
+  const [skillUnderTest] = await db
+    .select()
+    .from(t.skills)
+    .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.name, SKILL_EVAL_OWNER.skillName)));
+  const [skillEvalBaselineAgent] = await db
+    .select()
+    .from(t.agents)
+    .where(and(eq(t.agents.workspaceId, workspaceId), eq(t.agents.name, SKILL_EVAL_OWNER.baselineAgentName)));
+  if (skillUnderTest && skillEvalBaselineAgent) {
+    for (const def of SEED_SKILL_EVAL_CASES) {
+      const [existing] = await db
+        .select()
+        .from(t.evalCases)
+        .where(
+          and(
+            eq(t.evalCases.workspaceId, workspaceId),
+            eq(t.evalCases.ownerKind, 'skill'),
+            eq(t.evalCases.ownerId, skillUnderTest.id),
+            eq(t.evalCases.name, def.name),
+          ),
+        );
+      if (!existing) {
+        await db.insert(t.evalCases).values({
+          workspaceId,
+          ownerKind: 'skill',
+          ownerId: skillUnderTest.id,
+          baselineAgentId: skillEvalBaselineAgent.id,
+          name: def.name,
+          inputDiff: def.inputDiff,
+          expectationType: def.expectationType,
+          expectedOutput: def.expectedOutput,
+          notes: def.notes,
+        });
+      }
     }
   }
 

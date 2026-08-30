@@ -175,6 +175,7 @@ describe('AI contracts parse fixtures', () => {
         recall: 0.82,
         precision: 0.91,
         citation_accuracy: 0.95,
+        no_flag_rate: 0.1,
         traces_passed: 17,
         traces_total: 20,
         duration_ms: 12000,

@@ -3,7 +3,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../api";
-import type { Agent, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
+import type { Agent, AgentVersion, ModelInfo, Provider, ReviewStrategy } from "@devdigest/shared";
 
 export function useAgents() {
   return useQuery({
@@ -76,6 +76,27 @@ export function useDeleteAgent() {
     onSuccess: (_d, id) => {
       qc.invalidateQueries({ queryKey: ["agents"] });
       qc.removeQueries({ queryKey: ["agent", id] });
+    },
+  });
+}
+
+/** One config snapshot (AC-28's system-prompt diff, AC-29's Promote source). */
+export function useAgentVersion(agentId: string | null | undefined, version: number | null | undefined) {
+  return useQuery({
+    queryKey: ["agent-version", agentId, version],
+    queryFn: () => api.get<AgentVersion>(`/agents/${agentId}/versions/${version}`),
+    enabled: !!agentId && !!version,
+  });
+}
+
+/** Promote a past config snapshot onto the agent as a new version (AC-29). */
+export function usePromoteAgentVersion(agentId: string | null | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) => api.post<Agent>(`/agents/${agentId}/promote`, { version }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ["agents"] });
+      qc.setQueryData(["agent", data.id], data);
     },
   });
 }

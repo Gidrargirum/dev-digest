@@ -6,7 +6,7 @@ import { RunStatus } from "../RunStatus";
 import { RunHistory } from "../RunHistory/RunHistory";
 import { ReviewRunAccordion } from "../ReviewRunAccordion";
 import { s } from "./styles";
-import type { FindingRecord, ReviewRecord, RunSummary, PrCommit } from "@devdigest/shared";
+import type { FindingRecord, ReviewRecord, RunSummary, PrCommit, PrFile } from "@devdigest/shared";
 import type { useCancelRun } from "@/lib/hooks";
 
 interface FindingsTabProps {
@@ -29,6 +29,11 @@ interface FindingsTabProps {
   onOpenTrace: (id: string) => void;
   onDelete: (id: string) => void;
   onRunDone: () => void;
+  /** The PR's own title/body/files — forwarded to every ReviewRunAccordion so
+   *  "Turn into eval case" can seed a real `input_diff`/`input_meta` (AC-5). */
+  prTitle: string;
+  prBody?: string | null;
+  prFiles: PrFile[];
 }
 
 export function FindingsTab({
@@ -46,6 +51,9 @@ export function FindingsTab({
   onOpenTrace,
   onDelete,
   onRunDone,
+  prTitle,
+  prBody,
+  prFiles,
 }: FindingsTabProps) {
   const handleCancelAll = useCallback(() => {
     liveRunIds.forEach((id) => cancelMutation.mutate(id));
@@ -210,6 +218,9 @@ export function FindingsTab({
             targetNonce={target?.n ?? 0}
             targetFindingId={target?.findingId ?? null}
             runSummary={review.run_id ? runSummaryById.get(review.run_id) : undefined}
+            prTitle={prTitle}
+            prBody={prBody}
+            prFiles={prFiles}
           />
         ))
       )}

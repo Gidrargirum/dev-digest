@@ -35,7 +35,8 @@
       "preview": "Preview",
       "context": "Context",
       "stats": "Stats",
-      "versions": "Versions"
+      "versions": "Versions",
+      "evals": "Evals"
     }
   },
   "config": {

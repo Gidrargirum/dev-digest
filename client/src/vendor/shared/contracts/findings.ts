@@ -90,8 +90,10 @@ export const Review = z.object({
 });
 export type Review = z.infer<typeof Review>;
 
-/** Action taken on a finding (accept/dismiss/learn/reply). */
-export const FindingActionKind = z.enum(['accept', 'dismiss', 'learn', 'reply']);
+/** Action taken on a finding (accept/dismiss/learn/reply/reset). `reset`
+ *  clears both `accepted_at` and `dismissed_at`, undoing whichever triage
+ *  decision was made — a correction, not a third decision state. */
+export const FindingActionKind = z.enum(['accept', 'dismiss', 'learn', 'reply', 'reset']);
 export type FindingActionKind = z.infer<typeof FindingActionKind>;
 
 export const FindingAction = z.object({

@@ -8,6 +8,7 @@ import type {
   Provider,
   ReviewStrategy,
 } from '@devdigest/shared';
+import { AgentVersionConfig } from '@devdigest/shared';
 import { AgentsRepository } from './repository.js';
 import { toAgentDto, toAgentVersionDto } from './helpers.js';
 
@@ -133,6 +134,38 @@ export class AgentsService {
     if (!agent) return undefined;
     const row = await this.repo.getVersion(agentId, version);
     return row ? toAgentVersionDto(row) : undefined;
+  }
+
+  /**
+   * Promote a past config snapshot to the agent's current config (AC-29).
+   * Reads the `agent_versions` snapshot (404 if absent or cross-workspace via
+   * the workspace-scoped `getById` guard below), then applies it through
+   * `repo.update` — which already bumps `agents.version` and re-snapshots —
+   * so promoting v7 lands a NEW v8 equal to v7 and never rewinds history.
+   */
+  async promoteVersion(
+    workspaceId: string,
+    agentId: string,
+    version: number,
+  ): Promise<Agent | undefined> {
+    const agent = await this.repo.getById(workspaceId, agentId);
+    if (!agent) return undefined;
+    const snapshot = await this.repo.getVersion(agentId, version);
+    if (!snapshot) return undefined;
+
+    const config = AgentVersionConfig.parse(snapshot.configJson);
+    const row = await this.repo.update(workspaceId, agentId, {
+      provider: config.provider,
+      model: config.model,
+      systemPrompt: config.system_prompt,
+      outputSchema: config.output_schema,
+      strategy: config.strategy,
+      ciFailOn: config.ci_fail_on,
+      repoIntel: config.repo_intel,
+    });
+    if (!row) return undefined;
+    await this.repo.setSkills(agentId, config.skills);
+    return toAgentDto(row);
   }
 
   /** Linked skills for an agent as AgentSkillLink[] (ordered). */

@@ -1,0 +1,59 @@
+{
+  "name": "Accepting a seeded finding and turning it into an eval case surfaces the case on the agent's Evals tab",
+  "description": "From PR #482's findings, accept the seeded CRITICAL finding (seed ships it untriaged — AC-4 keeps 'Turn into eval case' disabled until an Accept/Dismiss decision exists), click 'Turn into eval case' (AC-1/AC-2, pre-seeds must_find from the finding's file/line/severity/category/title), save, then open the owning agent's Evals tab and wait for the new case's name (the finding's title, per FindingsPanel's buildEvalSeed). Read-only except for the Accept + eval-case-create mutations — no model call. Assumes the freshly-seeded hermetic stack (see e2e/README.md).",
+  "steps": [
+    { "cmd": ["open", "{BASE}/"], "label": "load the app root" },
+    { "cmd": ["wait", "--url", "/pulls"], "label": "land on the PR list" },
+    {
+      "cmd": ["wait", "--text", "Add rate limiting to public API endpoints"],
+      "label": "seeded PR title row is visible"
+    },
+    {
+      "cmd": ["find", "text", "Add rate limiting to public API endpoints", "click"],
+      "label": "open the PR row"
+    },
+    { "cmd": ["wait", "--url", "/pulls/482"], "label": "navigate to the PR detail route" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "PR detail data settles" },
+    {
+      "cmd": ["find", "role", "button", "click", "--name", "Agent runs"],
+      "label": "switch to the Agent runs tab"
+    },
+    { "cmd": ["wait", "--url", "tab=findings"], "label": "findings tab is active in the URL" },
+    {
+      "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"],
+      "label": "seeded CRITICAL FindingCard is visible (expanded by default)"
+    },
+    {
+      "cmd": ["find", "role", "button", "click", "--name", "Accept"],
+      "label": "accept the seeded finding (seed ships it untriaged, per e2e/insights 2026-08-02)"
+    },
+    {
+      "cmd": ["wait", "--text", "accepted"],
+      "label": "FindingCard shows the accepted tag — accepted_at is now set"
+    },
+    {
+      "cmd": ["find", "role", "button", "click", "--name", "Turn into eval case"],
+      "label": "AC-4 keeps this disabled until triage; now enabled by the Accept above"
+    },
+    {
+      "cmd": ["wait", "--text", "New eval case"],
+      "label": "eval case editor modal opens, pre-seeded from the accepted finding (AC-2)"
+    },
+    {
+      "cmd": ["find", "role", "button", "click", "--name", "Save"],
+      "label": "save the eval case (name pre-filled with the finding's title)"
+    },
+    { "cmd": ["open", "{BASE}/agents"], "label": "load the agents list" },
+    { "cmd": ["wait", "--url", "/agents"], "label": "agents route reached" },
+    { "cmd": ["wait", "--load", "networkidle"], "label": "agents fetch settles" },
+    { "cmd": ["wait", "--text", "General Reviewer"], "label": "the review's owning agent card is visible" },
+    { "cmd": ["find", "text", "General Reviewer", "click"], "label": "open the General Reviewer agent editor" },
+    { "cmd": ["wait", "--url", "tab=config"], "label": "agent editor route reached (default Config tab)" },
+    { "cmd": ["find", "role", "button", "click", "--name", "Evals"], "label": "switch to the Evals tab" },
+    { "cmd": ["wait", "--url", "tab=evals"], "label": "evals tab is active in the URL" },
+    {
+      "cmd": ["wait", "--text", "Hardcoded Stripe secret key in commit"],
+      "label": "the new eval case (named after the accepted finding) is listed"
+    }
+  ]
+}

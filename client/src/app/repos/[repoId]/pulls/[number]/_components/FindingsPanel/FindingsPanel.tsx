@@ -5,11 +5,12 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState, Icon, SEV, type Severity } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, PrFile } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
+import { EvalCaseEditor } from "@/components/eval-case-editor";
 import { useFindingAction } from "@/lib/hooks/reviews";
 import { KEY_TO_ACTION, FILTERABLE_SEVERITIES } from "./constants";
-import { visibleFindings, severityCounts } from "./helpers";
+import { visibleFindings, severityCounts, buildEvalSeed } from "./helpers";
 import { s } from "./styles";
 
 export function FindingsPanel({
@@ -19,6 +20,10 @@ export function FindingsPanel({
   headSha,
   targetFindingId = null,
   targetNonce = 0,
+  agentId = null,
+  prTitle = "",
+  prBody = null,
+  prFiles = [],
 }: {
   findings: FindingRecord[];
   prId: string;
@@ -30,12 +35,23 @@ export function FindingsPanel({
    *  uses, rather than adding a second highlight system. */
   targetFindingId?: string | null;
   targetNonce?: number;
+  /** The review's agent (owns any eval case created via "Turn into eval
+   *  case" — AC-1). `null` for legacy CI-imported reviews with no agent_id;
+   *  the action stays wired but has no agent to attribute the case to. */
+  agentId?: string | null;
+  /** The PR's own title/body/files — already loaded by the page, threaded
+   *  down so "Turn into eval case" can seed a real `input_diff`/`input_meta`
+   *  (AC-5) instead of opening the editor empty. */
+  prTitle?: string;
+  prBody?: string | null;
+  prFiles?: PrFile[];
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
   const [hideLow, setHideLow] = React.useState(false);
   const [severity, setSeverity] = React.useState<Severity | null>(null);
   const [focusIdx, setFocusIdx] = React.useState(0);
+  const [evalSeedFinding, setEvalSeedFinding] = React.useState<FindingRecord | null>(null);
   const listRef = React.useRef<HTMLDivElement | null>(null);
 
   const counts = React.useMemo(() => severityCounts(findings, hideLow), [findings, hideLow]);
@@ -151,11 +167,21 @@ export function FindingsPanel({
               pending={action.isPending}
               repoFullName={repoFullName}
               headSha={headSha}
+              onTurnIntoEvalCase={agentId ? () => setEvalSeedFinding(f) : undefined}
               onAction={(act) => action.mutate({ findingId: f.id, action: act, prId })}
             />
           ))
         )}
       </div>
+
+      {agentId && evalSeedFinding && (
+        <EvalCaseEditor
+          ownerKind="agent"
+          ownerId={agentId}
+          seed={buildEvalSeed(evalSeedFinding, { title: prTitle, body: prBody, files: prFiles })}
+          onClose={() => setEvalSeedFinding(null)}
+        />
+      )}
     </div>
   );
 }

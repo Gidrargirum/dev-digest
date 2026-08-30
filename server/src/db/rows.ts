@@ -21,3 +21,6 @@ export type ReviewRow = typeof t.reviews.$inferSelect;
 export type ConventionRow = typeof t.conventions.$inferSelect;
 export type ConventionScanRow = typeof t.conventionScans.$inferSelect;
 export type RepoRow = typeof t.repos.$inferSelect;
+export type EvalCaseRow = typeof t.evalCases.$inferSelect;
+export type EvalBatchRow = typeof t.evalBatches.$inferSelect;
+export type EvalRunRow = typeof t.evalRuns.$inferSelect;

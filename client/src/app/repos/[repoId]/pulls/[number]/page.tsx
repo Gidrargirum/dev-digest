@@ -152,6 +152,9 @@ export default function PRDetailPage() {
             repoFullName={repoFullName}
             headSha={pr.head_sha}
             targetFindingId={targetFindingId}
+            prTitle={pr.title}
+            prBody={pr.body}
+            prFiles={pr.files}
             cancelMutation={cancel}
             onOpenTrace={(id) => setParam("trace", id)}
             onDelete={(id) => {

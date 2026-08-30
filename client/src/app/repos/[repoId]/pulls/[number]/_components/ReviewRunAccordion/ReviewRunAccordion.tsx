@@ -7,7 +7,7 @@
 
 import React from "react";
 import { Icon, Badge } from "@devdigest/ui";
-import type { ReviewRecord, RunSummary, Verdict } from "@devdigest/shared";
+import type { ReviewRecord, RunSummary, Verdict, PrFile } from "@devdigest/shared";
 import { FindingsPanel } from "../FindingsPanel";
 import { VerdictBanner } from "../VerdictBanner";
 import { RunCostBadge } from "@/components/run-cost-badge";
@@ -34,6 +34,9 @@ export function ReviewRunAccordion({
   targetNonce = 0,
   targetFindingId = null,
   runSummary,
+  prTitle = "",
+  prBody = null,
+  prFiles = [],
 }: {
   review: ReviewRecord;
   prId: string;
@@ -51,6 +54,11 @@ export function ReviewRunAccordion({
   /** This run's cost/token stats (matched by run_id); undefined for reviews
    *  with no matching agent_runs row (e.g. legacy CI-imported reviews). */
   runSummary?: RunSummary;
+  /** The PR's own title/body/files — forwarded to FindingsPanel so "Turn into
+   *  eval case" can seed a real `input_diff`/`input_meta` (AC-5). */
+  prTitle?: string;
+  prBody?: string | null;
+  prFiles?: PrFile[];
 }) {
   const [open, setOpen] = React.useState(defaultOpen);
   const rootRef = React.useRef<HTMLDivElement | null>(null);
@@ -177,6 +185,10 @@ export function ReviewRunAccordion({
             headSha={headSha}
             targetFindingId={targetFindingId}
             targetNonce={targetNonce}
+            agentId={review.agent_id}
+            prTitle={prTitle}
+            prBody={prBody}
+            prFiles={prFiles}
           />
         </div>
       )}
