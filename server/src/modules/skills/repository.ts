@@ -3,6 +3,7 @@ import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { SkillRow, SkillVersionRow, CommunitySkillRow } from '../../db/rows.js';
 import { INITIAL_SKILL_VERSION } from './constants.js';
+import { EVAL_CASE_OWNER_KIND_SKILL } from '../_shared/constants.js';
 
 /**
  * Skills data-access layer. The ONLY place that touches `skills`,
@@ -51,12 +52,28 @@ export class SkillsRepository {
     return row;
   }
 
+  /**
+   * Delete a skill (scoped to workspace). `skill_versions`/`agent_skills`
+   * cascade at the DB level. This skill's `eval_cases` (owner_kind='skill')
+   * carry no FK — `owner_id` is polymorphic — so cascade delete does not
+   * apply (base spec's Module interactions, mirrored for skills by Amendment
+   * A). Deleted explicitly in the SAME transaction, mirroring
+   * `AgentsRepository.deleteById`; their `eval_runs` cascade via
+   * `eval_runs.case_id`. Returns false if no such skill existed in the
+   * workspace.
+   */
   async deleteById(workspaceId: string, id: string): Promise<boolean> {
-    const rows = await this.db
-      .delete(t.skills)
-      .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
-      .returning({ id: t.skills.id });
-    return rows.length > 0;
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .delete(t.skills)
+        .where(and(eq(t.skills.workspaceId, workspaceId), eq(t.skills.id, id)))
+        .returning({ id: t.skills.id });
+      if (rows.length === 0) return false;
+      await tx
+        .delete(t.evalCases)
+        .where(and(eq(t.evalCases.ownerKind, EVAL_CASE_OWNER_KIND_SKILL), eq(t.evalCases.ownerId, id)));
+      return true;
+    });
   }
 
   async insert(values: InsertSkill): Promise<SkillRow> {

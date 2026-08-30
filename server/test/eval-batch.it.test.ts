@@ -343,6 +343,7 @@ d('eval-batch (A5) — async execution, per-case failure isolation, empty set, i
     const evalRepo = new EvalRepository(pg.handle.db);
     await evalRepo.insertCase({
       workspaceId: otherWs!.id,
+      ownerKind: 'agent',
       ownerId: foreignAgent.id,
       name: 'Foreign case',
       inputDiff: DIFF,

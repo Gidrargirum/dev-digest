@@ -92,4 +92,18 @@ export const s = {
     gap: 10,
   } satisfies CSSProperties,
   composerActions: { display: "flex", gap: 8 } satisfies CSSProperties,
+  /* `Button`'s `active` prop only changes styling for `kind="tertiary"` (see
+     vendor/ui/primitives/Button.tsx) — Accept/Dismiss use "secondary"/"ghost"
+     so `active` alone is a no-op there. This is a call-site style override,
+     not a vendor edit, layered via Button's own `style` prop. */
+  acceptActive: {
+    background: "var(--ok)",
+    color: "#fff",
+    borderColor: "var(--ok)",
+  } satisfies CSSProperties,
+  dismissActive: {
+    background: "var(--bg-hover)",
+    color: "var(--text-primary)",
+    borderColor: "var(--border-strong)",
+  } satisfies CSSProperties,
 } as const;

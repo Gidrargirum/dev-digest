@@ -256,6 +256,7 @@ d('GET /agents/:id/versions', () => {
     const evalRepo = new EvalRepository(pg.handle.db);
     const evalCase = await evalRepo.insertCase({
       workspaceId: defaultWs!,
+      ownerKind: 'agent',
       ownerId: agentId,
       name: 'Case to be orphaned',
       inputDiff: 'diff --git a/x b/x',

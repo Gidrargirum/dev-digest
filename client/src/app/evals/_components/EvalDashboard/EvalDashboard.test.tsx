@@ -4,6 +4,7 @@ import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { EvalDashboard as EvalDashboardData } from "@devdigest/shared";
 import messages from "../../../../../messages/en/eval.json";
+import { ToastProvider } from "@/lib/toast";
 import { EvalDashboard } from "./EvalDashboard";
 
 vi.mock("next/navigation", () => ({
@@ -29,6 +30,10 @@ const DASHBOARD: EvalDashboardData = {
         id: "batch1",
         agent_id: "ag1",
         agent_version: 3,
+        owner_kind: "agent",
+        owner_id: "ag1",
+        skill_version: null,
+        marginal: null,
         status: "done",
         started_at: "2026-08-29T00:00:00Z",
         finished_at: "2026-08-29T00:01:00Z",
@@ -80,6 +85,9 @@ function renderDashboard(data: EvalDashboardData) {
       if (url.endsWith("/evals/dashboard")) {
         return { ok: true, status: 200, json: async () => data } as Response;
       }
+      if (/\/agents\/[^/]+\/eval-runs$/.test(url)) {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
       throw new Error(`unexpected fetch: ${url}`);
     }),
   );
@@ -87,7 +95,9 @@ function renderDashboard(data: EvalDashboardData) {
   return render(
     <QueryClientProvider client={qc}>
       <NextIntlClientProvider locale="en" messages={{ eval: messages }}>
-        <EvalDashboard />
+        <ToastProvider>
+          <EvalDashboard />
+        </ToastProvider>
       </NextIntlClientProvider>
     </QueryClientProvider>,
   );
@@ -99,7 +109,8 @@ describe("EvalDashboard", () => {
 
     expect((await screen.findAllByText("Security Reviewer")).length).toBeGreaterThan(0);
     expect(screen.getByText("gpt-4.1")).toBeInTheDocument();
-    expect(screen.getByText("RECALL: 100%")).toBeInTheDocument();
+    expect(screen.getByText("RECALL")).toBeInTheDocument();
+    expect(screen.getAllByText("100%").length).toBeGreaterThan(0);
 
     expect(screen.getByText("Style Reviewer")).toBeInTheDocument();
     expect(screen.getByText("gpt-4o-mini")).toBeInTheDocument();

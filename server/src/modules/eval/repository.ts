@@ -1,8 +1,10 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, desc, eq, isNull, or } from 'drizzle-orm';
 import type { Db } from '../../db/client.js';
 import * as t from '../../db/schema.js';
 import type { EvalBatchRow, EvalCaseRow, EvalRunRow } from '../../db/rows.js';
-import { EVAL_CASE_OWNER_KIND, DASHBOARD_RECENT_RUNS_LIMIT } from './constants.js';
+import { EVAL_CASE_OWNER_KIND_AGENT, DASHBOARD_RECENT_RUNS_LIMIT } from './constants.js';
+
+type EvalOwnerKind = 'agent' | 'skill';
 
 /**
  * Eval data-access. The ONLY file in this module touching `db/schema` —
@@ -13,7 +15,10 @@ import { EVAL_CASE_OWNER_KIND, DASHBOARD_RECENT_RUNS_LIMIT } from './constants.j
 
 export interface InsertEvalCase {
   workspaceId: string;
+  ownerKind: EvalOwnerKind;
   ownerId: string;
+  /** Required for `ownerKind: 'skill'` (AC-38); enforced by the service. */
+  baselineAgentId?: string | null;
   name: string;
   inputDiff?: string;
   inputFiles?: unknown;
@@ -24,6 +29,7 @@ export interface InsertEvalCase {
 }
 
 export interface UpdateEvalCase {
+  baselineAgentId?: string | null;
   name?: string;
   inputDiff?: string;
   inputFiles?: unknown;
@@ -37,6 +43,12 @@ export interface InsertEvalBatch {
   workspaceId: string;
   agentId: string;
   agentVersion: number;
+  /** What the batch measures (AC-40) — defaults to 'agent' behavior when
+   *  omitted, matching every batch inserted before Amendment A. */
+  ownerKind: EvalOwnerKind;
+  ownerId: string;
+  /** The skill's version in force at execution time — null for an agent batch. */
+  skillVersion?: number | null;
 }
 
 export interface FinishEvalBatch {
@@ -49,6 +61,10 @@ export interface FinishEvalBatch {
   noFlagRate: number | null;
   costUsd: number | null;
   durationMs: number;
+  /** Batch-level marginal effect (AC-50) — null for an agent batch. */
+  marginalRecall?: number | null;
+  marginalPrecision?: number | null;
+  marginalCitationAccuracy?: number | null;
 }
 
 export interface InsertEvalRun {
@@ -90,15 +106,19 @@ export interface EvalAgentDashboardEntry {
 export class EvalRepository {
   constructor(private db: Db) {}
 
-  async listCasesForAgent(workspaceId: string, agentId: string): Promise<EvalCaseRow[]> {
+  async listCasesForOwner(
+    workspaceId: string,
+    ownerKind: EvalOwnerKind,
+    ownerId: string,
+  ): Promise<EvalCaseRow[]> {
     return this.db
       .select()
       .from(t.evalCases)
       .where(
         and(
           eq(t.evalCases.workspaceId, workspaceId),
-          eq(t.evalCases.ownerKind, EVAL_CASE_OWNER_KIND),
-          eq(t.evalCases.ownerId, agentId),
+          eq(t.evalCases.ownerKind, ownerKind),
+          eq(t.evalCases.ownerId, ownerId),
         ),
       );
   }
@@ -116,8 +136,9 @@ export class EvalRepository {
       .insert(t.evalCases)
       .values({
         workspaceId: values.workspaceId,
-        ownerKind: EVAL_CASE_OWNER_KIND,
+        ownerKind: values.ownerKind,
         ownerId: values.ownerId,
+        baselineAgentId: values.baselineAgentId ?? null,
         name: values.name,
         inputDiff: values.inputDiff ?? '',
         inputFiles: (values.inputFiles as object | undefined) ?? null,
@@ -138,6 +159,7 @@ export class EvalRepository {
     const [row] = await this.db
       .update(t.evalCases)
       .set({
+        ...(patch.baselineAgentId !== undefined ? { baselineAgentId: patch.baselineAgentId } : {}),
         ...(patch.name !== undefined ? { name: patch.name } : {}),
         ...(patch.inputDiff !== undefined ? { inputDiff: patch.inputDiff } : {}),
         ...(patch.inputFiles !== undefined ? { inputFiles: patch.inputFiles as object } : {}),
@@ -166,6 +188,9 @@ export class EvalRepository {
         workspaceId: values.workspaceId,
         agentId: values.agentId,
         agentVersion: values.agentVersion,
+        ownerKind: values.ownerKind,
+        ownerId: values.ownerId,
+        skillVersion: values.skillVersion ?? null,
         status: 'running',
       })
       .returning();
@@ -194,15 +219,38 @@ export class EvalRepository {
         noFlagRate: patch.noFlagRate,
         costUsd: patch.costUsd,
         durationMs: patch.durationMs,
+        ...(patch.marginalRecall !== undefined ? { marginalRecall: patch.marginalRecall } : {}),
+        ...(patch.marginalPrecision !== undefined ? { marginalPrecision: patch.marginalPrecision } : {}),
+        ...(patch.marginalCitationAccuracy !== undefined
+          ? { marginalCitationAccuracy: patch.marginalCitationAccuracy }
+          : {}),
       })
       .where(eq(t.evalBatches.id, batchId));
   }
 
-  async listBatchesForAgent(workspaceId: string, agentId: string): Promise<EvalBatchRow[]> {
+  /**
+   * A batch's history for its owner. For `ownerKind: 'agent'`, includes both
+   * (a) batches explicitly recorded with `ownerKind = 'agent' AND ownerId =
+   * agentId` and (b) historical rows from before this column existed, which
+   * have `ownerId IS NULL` but a matching `agentId` — without the fallback an
+   * agent's pre-Amendment-A run history would silently disappear.
+   */
+  async listBatchesForOwner(
+    workspaceId: string,
+    ownerKind: EvalOwnerKind,
+    ownerId: string,
+  ): Promise<EvalBatchRow[]> {
+    const ownerMatch =
+      ownerKind === EVAL_CASE_OWNER_KIND_AGENT
+        ? or(
+            and(eq(t.evalBatches.ownerKind, ownerKind), eq(t.evalBatches.ownerId, ownerId)),
+            and(isNull(t.evalBatches.ownerId), eq(t.evalBatches.agentId, ownerId)),
+          )
+        : and(eq(t.evalBatches.ownerKind, ownerKind), eq(t.evalBatches.ownerId, ownerId));
     return this.db
       .select()
       .from(t.evalBatches)
-      .where(and(eq(t.evalBatches.workspaceId, workspaceId), eq(t.evalBatches.agentId, agentId)))
+      .where(and(eq(t.evalBatches.workspaceId, workspaceId), ownerMatch))
       .orderBy(desc(t.evalBatches.startedAt));
   }
 
@@ -237,14 +285,15 @@ export class EvalRepository {
     return rows.map((r) => ({ ...r.run, caseName: r.caseName ?? undefined }));
   }
 
-  /** The most recent run for each case belonging to an agent (one row per
-   *  case, newest first) — used for the case list's "last run" column. */
-  async latestRunPerCase(agentId: string): Promise<EvalRunWithCaseName[]> {
+  /** The most recent run for each case belonging to an owner (agent or
+   *  skill, one row per case, newest first) — used for the case list's "last
+   *  run" column. */
+  async latestRunPerOwner(ownerKind: EvalOwnerKind, ownerId: string): Promise<EvalRunWithCaseName[]> {
     const rows = await this.db
       .select({ run: t.evalRuns, caseName: t.evalCases.name })
       .from(t.evalRuns)
       .innerJoin(t.evalCases, eq(t.evalRuns.caseId, t.evalCases.id))
-      .where(and(eq(t.evalCases.ownerKind, EVAL_CASE_OWNER_KIND), eq(t.evalCases.ownerId, agentId)))
+      .where(and(eq(t.evalCases.ownerKind, ownerKind), eq(t.evalCases.ownerId, ownerId)))
       .orderBy(desc(t.evalRuns.ranAt));
     const seen = new Set<string>();
     const latest: EvalRunWithCaseName[] = [];
@@ -274,7 +323,11 @@ export class EvalRepository {
       .innerJoin(t.evalBatches, eq(t.evalRuns.batchId, t.evalBatches.id))
       .innerJoin(t.agents, eq(t.evalBatches.agentId, t.agents.id))
       .leftJoin(t.evalCases, eq(t.evalRuns.caseId, t.evalCases.id))
-      .where(eq(t.evalBatches.workspaceId, workspaceId))
+      // A-4: the workspace dashboard is agent-only — skill batches never
+      // appear here, only on the skill's own Evals tab.
+      .where(
+        and(eq(t.evalBatches.workspaceId, workspaceId), eq(t.evalBatches.ownerKind, EVAL_CASE_OWNER_KIND_AGENT)),
+      )
       .orderBy(desc(t.evalRuns.ranAt))
       .limit(limit);
     return rows.map((r) => ({
@@ -297,10 +350,14 @@ export class EvalRepository {
         .select({ id: t.agents.id, name: t.agents.name, model: t.agents.model })
         .from(t.agents)
         .where(eq(t.agents.workspaceId, workspaceId)),
+      // A-4: agent-only dashboard — a skill batch must never surface here as
+      // if it were an agent's own run.
       this.db
         .select()
         .from(t.evalBatches)
-        .where(eq(t.evalBatches.workspaceId, workspaceId))
+        .where(
+          and(eq(t.evalBatches.workspaceId, workspaceId), eq(t.evalBatches.ownerKind, EVAL_CASE_OWNER_KIND_AGENT)),
+        )
         .orderBy(desc(t.evalBatches.startedAt)),
     ]);
     const latestByAgent = new Map<string, EvalBatchRow>();

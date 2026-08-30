@@ -77,6 +77,9 @@ flowchart TB
   subgraph Intel["Repo intelligence"]
     repoIntel["repo-intel<br/>/repos/:id/index-state · /resync"]
   end
+  subgraph Eval["Eval (L06)"]
+    eval["eval<br/>/agents/:id/eval-cases · /agents/:id/eval-runs<br/>/skills/:id/eval-cases · /skills/:id/eval-runs<br/>/eval-cases/:caseId(/run) · /eval-runs/:batchId · /evals/dashboard"]
+  end
   subgraph Platform["Platform"]
     settings["settings<br/>/settings · /providers"]
     workspace["workspace<br/>/workspace"]

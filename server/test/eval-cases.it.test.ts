@@ -239,6 +239,7 @@ d('eval-cases (A5) — authoring, malformed input, seed, isolation', () => {
     const evalRepo = new EvalRepository(pg.handle.db);
     const foreignCase = await evalRepo.insertCase({
       workspaceId: otherWs!.id,
+      ownerKind: 'agent',
       ownerId: foreignAgent.id,
       name: 'Foreign case',
       inputDiff: DIFF,

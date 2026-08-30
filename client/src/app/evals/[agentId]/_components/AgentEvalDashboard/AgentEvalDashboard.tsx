@@ -9,10 +9,10 @@ import { useTranslations } from "next-intl";
 import { AppShell } from "@/components/app-shell";
 import { Button, Checkbox, EmptyState, ErrorState, Icon, LineChart, MetricCard, Skeleton } from "@devdigest/ui";
 import { useAgent } from "@/lib/hooks/agents";
-import { useEvalBatches, useEvalCases, useStartEvalBatch } from "@/lib/hooks/eval";
+import { useEvalBatches, useEvalCases, useRunAgentEvalBatch } from "@/lib/hooks/eval";
 import { ApiError } from "@/lib/api";
 import { CompareRunsPopup } from "../CompareRunsPopup";
-import { COMPARE_SELECTION_SIZE, MIN_BATCHES_FOR_TREND } from "./constants";
+import { COMPARE_SELECTION_SIZE, MIN_BATCHES_FOR_TREND, PAGE_MAX_WIDTH } from "./constants";
 import { metricSeries, precisionRegression, tracesPassedPct } from "./helpers";
 import { s } from "./styles";
 
@@ -21,7 +21,7 @@ export function AgentEvalDashboard({ agentId }: { agentId: string }) {
   const { data: agent, isError: agentError } = useAgent(agentId);
   const { data: batches, isLoading, isError, error, refetch } = useEvalBatches(agentId);
   const { data: cases } = useEvalCases(agentId);
-  const startBatch = useStartEvalBatch(agentId);
+  const { run: runAllEvals, isRunning: allEvalsRunning } = useRunAgentEvalBatch(agentId);
   const [selected, setSelected] = React.useState<string[]>([]);
   const [showCompare, setShowCompare] = React.useState(false);
 
@@ -67,11 +67,11 @@ export function AgentEvalDashboard({ agentId }: { agentId: string }) {
           <Button
             kind="secondary"
             icon="Play"
-            loading={startBatch.isPending}
+            loading={allEvalsRunning}
             disabled={!cases || cases.length === 0}
-            onClick={() => startBatch.mutate()}
+            onClick={runAllEvals}
           >
-            {t("dashboard.runEval", { count: cases?.length ?? 0 })}
+            {allEvalsRunning ? t("dashboard.running") : t("dashboard.runEval", { count: cases?.length ?? 0 })}
           </Button>
         </div>
 
@@ -114,7 +114,12 @@ export function AgentEvalDashboard({ agentId }: { agentId: string }) {
             {list.length >= MIN_BATCHES_FOR_TREND && (
               <div>
                 <div style={s.sectionTitle}>{t("dashboard.metricTrend")}</div>
-                <LineChart series={metricSeries(list)} yMin={0} yMax={1} />
+                {/* `w` sets LineChart's own `maxWidth` (defaults to 620px) —
+                   without it the chart stayed capped well inside this
+                   page's wider content column instead of filling it,
+                   unlike the metric cards above it. Match `styles.ts`'s
+                   `wrap.maxWidth` so it fills exactly as wide as those. */}
+                <LineChart series={metricSeries(list)} yMin={0} yMax={1} w={PAGE_MAX_WIDTH} />
               </div>
             )}
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { render, screen, cleanup, waitFor, fireEvent } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Agent, EvalCase, EvalBatch, EvalRunRecord } from "@devdigest/shared";
@@ -46,6 +46,10 @@ const BATCH: EvalBatch = {
   id: "batch1",
   agent_id: "ag1",
   agent_version: 3,
+  owner_kind: "agent",
+  owner_id: "ag1",
+  skill_version: null,
+  marginal: null,
   status: "done",
   started_at: "2026-08-29T00:00:00Z",
   finished_at: "2026-08-29T00:01:00Z",
@@ -108,7 +112,52 @@ function renderTab() {
   );
 }
 
+const CASE2: EvalCase = {
+  ...CASE,
+  id: "case2",
+  name: "sql-injection",
+};
+
 describe("EvalsTab", () => {
+  it("blocks every other Run action while one case or the whole batch is in flight", async () => {
+    // Neither the single-case run nor the batch POST ever resolves here —
+    // the test only needs the "in flight" window, not a completed run.
+    const fetchMock = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input);
+      const method = init?.method ?? "GET";
+      if (url.endsWith("/agents/ag1/eval-cases")) {
+        return { ok: true, status: 200, json: async () => [CASE, CASE2] } as Response;
+      }
+      if (url.endsWith("/agents/ag1/eval-runs") && method === "GET") {
+        return { ok: true, status: 200, json: async () => [] } as Response;
+      }
+      if (url.endsWith("/agents/ag1/eval-runs") && method === "POST") {
+        return new Promise<Response>(() => undefined); // never settles
+      }
+      if (url.endsWith("/eval-cases/case1/run")) {
+        return new Promise<Response>(() => undefined); // never settles
+      }
+      throw new Error(`unexpected fetch: ${method} ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderTab();
+
+    const runButtons = await screen.findAllByRole("button", { name: "Run" });
+    expect(runButtons).toHaveLength(2);
+    const runAllButton = screen.getByRole("button", { name: /Run eval/ });
+    expect(runAllButton).toBeEnabled();
+    expect(runButtons[0]).toBeEnabled();
+    expect(runButtons[1]).toBeEnabled();
+
+    fireEvent.click(runButtons[0]!);
+
+    // case1 shows its own loading state; case2's Run and "Run eval" both lock.
+    await waitFor(() => expect(runButtons[0]).toBeDisabled());
+    expect(runButtons[1]).toBeDisabled();
+    expect(runAllButton).toBeDisabled();
+  });
+
   it("lists each case with its badge, recall summary and actions (AC-10)", async () => {
     mockFetch({ cases: [CASE], batches: [BATCH], runs: [RUN_RECORD] });
     renderTab();

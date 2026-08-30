@@ -33,10 +33,18 @@ import {
  * still gets the same cross-field check whenever both fields are present.
  */
 export const EvalCaseInputShape = z.object({
-  // Non-goal: `owner_kind` is constrained to 'agent' at the route level (an
-  // EvalOwnerKind of 'skill' is rejected with 400) — see modules/eval/routes.ts.
+  // Amendment A: `owner_kind = 'skill'` is a first-class, supported value
+  // (AC-36) — no longer rejected at the route level. For a skill-owned case,
+  // `baseline_agent_id` is required; that requirement is enforced by
+  // `EvalService`, keyed off `owner_kind`, NOT by this schema (a
+  // discriminated union was considered and rejected — see the plan's
+  // Recommendations — because it would retroactively make `baseline_agent_id`
+  // required-looking on the already-shipped agent-owned shape).
   owner_kind: EvalOwnerKind,
   owner_id: z.string(),
+  // Required only for `owner_kind = 'skill'` (AC-38); the service, not this
+  // schema, enforces that. `null`/absent for `owner_kind = 'agent'`.
+  baseline_agent_id: z.string().uuid().nullish(),
   name: z.string().min(1),
   input_diff: z.string().default(''),
   input_files: z.unknown().nullish(),
@@ -68,6 +76,50 @@ export function refineMustNotFlagExpectedOutput(
 export const EvalCaseInput = EvalCaseInputShape.superRefine(refineMustNotFlagExpectedOutput);
 export type EvalCaseInput = z.infer<typeof EvalCaseInput>;
 
+/**
+ * The scored outcome of ONE review pass (Amendment A, AC-53) — either the
+ * `with` pass (skill under test present) or the `without` pass (skill
+ * removed) of a skill-owned case's two-pass execution. `error` is set, and
+ * every other field left at its zero-signal value, when that specific pass
+ * failed (AC-46) while the other pass succeeded.
+ */
+export const EvalPassResult = z.object({
+  findings: z.array(Finding),
+  recall: z.number().min(0).max(1).nullable(),
+  precision: z.number().min(0).max(1).nullable(),
+  citation_accuracy: z.number().min(0).max(1).nullable(),
+  pass: z.boolean(),
+  duration_ms: z.number().int(),
+  cost_usd: z.number().nullable(),
+  error: z.string().nullish(),
+});
+export type EvalPassResult = z.infer<typeof EvalPassResult>;
+
+/**
+ * The `with` − `without` signed difference of each metric (AC-50). `null`
+ * whenever either side is `null` under AC-22 — a missing value is never
+ * treated as zero. Zero itself ("both passes scored identically") is a
+ * distinct, valid value (AC-51).
+ */
+export const EvalMarginalEffect = z.object({
+  recall: z.number().nullable(),
+  precision: z.number().nullable(),
+  citation_accuracy: z.number().nullable(),
+});
+export type EvalMarginalEffect = z.infer<typeof EvalMarginalEffect>;
+
+/**
+ * `EvalRunRecord.actual_output`'s shape for a skill-owned run (AC-53) — a
+ * consumer tells this apart from the agent-owned flat shape via the owning
+ * batch/case's `owner_kind`, never by probing the payload.
+ */
+export const EvalSkillActualOutput = z.object({
+  with: EvalPassResult.nullable(),
+  without: EvalPassResult.nullable(),
+  marginal: EvalMarginalEffect,
+});
+export type EvalSkillActualOutput = z.infer<typeof EvalSkillActualOutput>;
+
 /** A persisted eval run row (one execution of a case), returned by the API. */
 export const EvalRunRecord = z.object({
   id: z.string(),
@@ -97,11 +149,27 @@ export type EvalRunRecord = z.infer<typeof EvalRunRecord>;
 export const EvalBatchStatus = z.enum(['running', 'done', 'failed', 'cancelled']);
 export type EvalBatchStatus = z.infer<typeof EvalBatchStatus>;
 
-/** A persisted eval batch (mirrors `eval_batches`) — one `POST /agents/:id/eval-runs`. */
+/**
+ * A persisted eval batch (mirrors `eval_batches`) — one
+ * `POST /agents/:id/eval-runs` or `POST /skills/:id/eval-runs` (Amendment A).
+ *
+ * `agent_id`/`agent_version` are always the BASELINE agent — for a skill
+ * batch that is the agent supplying provider/model/system_prompt for both
+ * passes, not "the agent under test" (skills have no agent of their own).
+ * `owner_kind`/`owner_id` (AC-40) name what the batch actually measures:
+ * `'agent'`/agent id for an agent batch, `'skill'`/skill id for a skill
+ * batch. `skill_version` is the skill's version in force at execution time
+ * (AC-40); `null` for an agent batch. `marginal` is the batch-level
+ * macro-averaged marginal effect (AC-50); `null` for an agent batch, which
+ * has no `with`/`without` distinction.
+ */
 export const EvalBatch = z.object({
   id: z.string(),
   agent_id: z.string(),
   agent_version: z.number().int(),
+  owner_kind: EvalOwnerKind,
+  owner_id: z.string(),
+  skill_version: z.number().int().nullable(),
   status: EvalBatchStatus,
   started_at: z.string(),
   finished_at: z.string().nullable(),
@@ -113,6 +181,7 @@ export const EvalBatch = z.object({
   no_flag_rate: z.number().nullable(),
   cost_usd: z.number().nullable(),
   duration_ms: z.number().int().nullable(),
+  marginal: EvalMarginalEffect.nullable(),
 });
 export type EvalBatch = z.infer<typeof EvalBatch>;
 

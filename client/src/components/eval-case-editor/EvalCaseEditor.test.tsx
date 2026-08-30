@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { NextIntlClientProvider } from "next-intl";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { EvalCase, EvalRun } from "@devdigest/shared";
+import type { EvalCase, EvalRunRecord } from "@devdigest/shared";
 import messages from "../../../messages/en/eval.json";
 import { ToastProvider } from "@/lib/toast";
 import { EvalCaseEditor } from "./EvalCaseEditor";
@@ -27,16 +27,21 @@ const EVAL_CASE: EvalCase = {
   notes: null,
 };
 
-const RUN_RESULT: EvalRun = {
+const RUN_RECORD: EvalRunRecord = {
+  id: "run1",
+  case_id: "case1",
+  case_name: "stripe-key-leak",
+  batch_id: "batch1",
+  ran_at: "2026-08-29T00:01:00Z",
+  actual_output: {},
+  pass: true,
   recall: 1,
   precision: 1,
   citation_accuracy: 1,
-  no_flag_rate: null,
-  traces_passed: 1,
-  traces_total: 1,
   duration_ms: 1200,
   cost_usd: 0.002,
-  per_trace: [],
+  matched: EVAL_CASE.expected_output,
+  unmatched: [],
 };
 
 function renderEditor(props: Partial<React.ComponentProps<typeof EvalCaseEditor>> = {}) {
@@ -75,10 +80,16 @@ describe("EvalCaseEditor", () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);
       if (url.endsWith("/eval-cases/case1/run")) {
+        return { ok: true, status: 200, json: async () => ({ batch_id: "batch1" }) } as Response;
+      }
+      if (url.endsWith("/eval-runs/batch1")) {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ run_id: "run1", case_id: "case1", result: RUN_RESULT }),
+          json: async () => ({
+            batch: { id: "batch1", status: "done" },
+            runs: [RUN_RECORD],
+          }),
         } as Response;
       }
       throw new Error(`unexpected fetch: ${url}`);
@@ -93,5 +104,7 @@ describe("EvalCaseEditor", () => {
 
     await waitFor(() => expect(screen.queryByText("Never run yet")).not.toBeInTheDocument());
     expect(screen.getByText("recall 100% · precision 100% · citation 100% · 1.2s")).toBeInTheDocument();
+    expect(screen.getByText("Last run passed")).toBeInTheDocument();
+    expect(screen.getByText("· 1/1 passed · 1.2s · $0.00")).toBeInTheDocument();
   });
 });

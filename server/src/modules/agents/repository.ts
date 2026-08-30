@@ -4,7 +4,7 @@ import * as t from '../../db/schema.js';
 import type { CiFailOn, Provider, ReviewStrategy } from '@devdigest/shared';
 import { DEFAULT_AGENT_DESCRIPTION, INITIAL_AGENT_VERSION } from './constants.js';
 import { isConfigChange } from './helpers.js';
-import { EVAL_CASE_OWNER_KIND } from '../_shared/constants.js';
+import { EVAL_CASE_OWNER_KIND_AGENT } from '../_shared/constants.js';
 
 /**
  * A2 — agents data-access. Owns `agents`, `agent_versions`, and the
@@ -90,7 +90,7 @@ export class AgentsRepository {
       if (rows.length === 0) return false;
       await tx
         .delete(t.evalCases)
-        .where(and(eq(t.evalCases.ownerKind, EVAL_CASE_OWNER_KIND), eq(t.evalCases.ownerId, id)));
+        .where(and(eq(t.evalCases.ownerKind, EVAL_CASE_OWNER_KIND_AGENT), eq(t.evalCases.ownerId, id)));
       return true;
     });
   }

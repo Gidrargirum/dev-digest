@@ -28,6 +28,13 @@ export async function actOnFinding(
       const row = await repo.setFindingDismissed(findingId, new Date());
       return { finding: findingRowToDto(row!) };
     }
+    case 'reset': {
+      // setFindingAccepted(id, null) clears BOTH accepted_at and
+      // dismissed_at (see review.repo.ts) — undoing whichever decision was
+      // made, not a third triage state.
+      const row = await repo.setFindingAccepted(findingId, null);
+      return { finding: findingRowToDto(row!) };
+    }
     default:
       throw new AppError('invalid_action', `Action '${action}' is not available in the starter`, 400);
   }

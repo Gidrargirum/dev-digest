@@ -101,6 +101,13 @@ export const EvalCase = z
     id: z.string(),
     owner_kind: EvalOwnerKind,
     owner_id: z.string(),
+    // The baseline agent whose provider/model/system_prompt/remaining skills
+    // supply both passes of a skill-owned case's execution (Amendment A,
+    // AC-38). Required (in practice, enforced by the service — see
+    // `EvalCaseInputShape` in `eval-ci.ts`) when `owner_kind = 'skill'`;
+    // meaningless and left `null` for `owner_kind = 'agent'`. Chosen by the
+    // user in the case editor, never auto-inferred from `agent_skills`.
+    baseline_agent_id: z.string().uuid().nullish(),
     name: z.string(),
     input_diff: z.string(),
     input_files: z.unknown(),

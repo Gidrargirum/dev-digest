@@ -161,6 +161,53 @@ function macroAverage(values: (number | null)[]): number | null {
   return present.reduce((sum, v) => sum + v, 0) / present.length;
 }
 
+/**
+ * Amendment A (AC-50) — the signed `with` − `without` difference of one
+ * metric. `null` whenever either side is `null` under AC-22 (a missing value
+ * is never treated as zero); an identical pair of present values yields
+ * exact `0`, not an absent value (AC-51), because subtraction of equal
+ * numbers is `0` by construction — no special-casing needed.
+ */
+function marginal(withValue: number | null, withoutValue: number | null): number | null {
+  if (withValue === null || withoutValue === null) return null;
+  return withValue - withoutValue;
+}
+
+export interface MarginalEffectInput {
+  recall: number | null;
+  precision: number | null;
+  citation_accuracy: number | null;
+}
+
+export interface MarginalEffectResult {
+  recall: number | null;
+  precision: number | null;
+  citation_accuracy: number | null;
+}
+
+/** Per-case marginal effect (AC-50/AC-51) — a pure function of the two
+ *  already-scored passes, reads no clock/network/database. */
+export function marginalEffect(
+  withResult: MarginalEffectInput,
+  withoutResult: MarginalEffectInput,
+): MarginalEffectResult {
+  return {
+    recall: marginal(withResult.recall, withoutResult.recall),
+    precision: marginal(withResult.precision, withoutResult.precision),
+    citation_accuracy: marginal(withResult.citation_accuracy, withoutResult.citation_accuracy),
+  };
+}
+
+/** Batch-level marginal effect — macro-averaged over cases with a value for
+ *  that metric (AC-26's rule, applied identically to the marginal figures). */
+export function aggregateMarginal(perCase: MarginalEffectResult[]): MarginalEffectResult {
+  return {
+    recall: macroAverage(perCase.map((c) => c.recall)),
+    precision: macroAverage(perCase.map((c) => c.precision)),
+    citation_accuracy: macroAverage(perCase.map((c) => c.citation_accuracy)),
+  };
+}
+
 /** Aggregate a batch's per-case results into the batch-level metrics. */
 export function aggregate(caseResults: CaseAggregateInput[]): AggregateResult {
   const cases_total = caseResults.length;

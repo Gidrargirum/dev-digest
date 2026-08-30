@@ -22,6 +22,7 @@ export function toEvalCaseDto(row: EvalCaseRow): EvalCase {
     id: row.id,
     owner_kind: row.ownerKind as EvalCase['owner_kind'],
     owner_id: row.ownerId,
+    baseline_agent_id: row.baselineAgentId,
     name: row.name,
     input_diff: row.inputDiff ?? '',
     input_files: row.inputFiles,
@@ -37,6 +38,12 @@ export function toEvalBatchDto(row: EvalBatchRow): EvalBatch {
     id: row.id,
     agent_id: row.agentId,
     agent_version: row.agentVersion,
+    // `owner_id` falls back to `agentId` for a historical row inserted
+    // before Amendment A (`owner_id` was nullable to avoid a migration
+    // backfill on a non-empty table).
+    owner_kind: row.ownerKind as EvalBatch['owner_kind'],
+    owner_id: row.ownerId ?? row.agentId,
+    skill_version: row.skillVersion,
     status: row.status as EvalBatch['status'],
     started_at: row.startedAt.toISOString(),
     finished_at: row.finishedAt ? row.finishedAt.toISOString() : null,
@@ -48,6 +55,19 @@ export function toEvalBatchDto(row: EvalBatchRow): EvalBatch {
     no_flag_rate: row.noFlagRate,
     cost_usd: row.costUsd,
     duration_ms: row.durationMs,
+    // `null` for an agent batch (no with/without distinction to report) —
+    // keyed off `ownerKind`, not off the column values, so a skill batch
+    // whose marginal happens to be all-null (every case's marginal was
+    // itself null under AC-22) is still distinguishable from "not a skill
+    // batch at all".
+    marginal:
+      row.ownerKind === 'skill'
+        ? {
+            recall: row.marginalRecall,
+            precision: row.marginalPrecision,
+            citation_accuracy: row.marginalCitationAccuracy,
+          }
+        : null,
   };
 }
 

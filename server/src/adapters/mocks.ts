@@ -52,6 +52,20 @@ export interface MockLLMOptions {
    * by req.schemaName; falls back to `structured` when no entry matches.
    */
   structuredBySchema?: Record<string, unknown>;
+  /**
+   * Fixtures returned in ORDER across successive `completeStructured` calls,
+   * regardless of `schemaName` — a per-instance call counter advances one
+   * fixture per call and WRAPS AROUND (modulo the array length) once
+   * exhausted, so a 2-entry sequence alternates indefinitely across many
+   * calls (never falls back to `structured`/`structuredBySchema` — a caller
+   * opting into a sequence gets a consistent, fully-controlled series).
+   * Added for Amendment A's `verify:l06` check (AC-61): a skill batch's
+   * `with` and `without` passes are two SEPARATE `completeStructured` calls,
+   * repeated once per case, that must return DIFFERENT findings for the
+   * check to prove anything — `structured` alone always returns the same
+   * fixture on every call.
+   */
+  structuredSequence?: unknown[];
   completionText?: string;
   embedding?: number[];
 }
@@ -59,6 +73,7 @@ export interface MockLLMOptions {
 export class MockLLMProvider implements LLMProvider {
   readonly id: 'openai' | 'anthropic';
   public calls: { method: string; req: unknown }[] = [];
+  private structuredCallCount = 0;
 
   constructor(
     id: 'openai' | 'anthropic' = 'openai',
@@ -89,7 +104,14 @@ export class MockLLMProvider implements LLMProvider {
 
   async completeStructured<T>(req: StructuredRequest<T>): Promise<StructuredResult<T>> {
     this.calls.push({ method: 'completeStructured', req });
-    const fixture = this.opts.structuredBySchema?.[req.schemaName] ?? this.opts.structured ?? {};
+    let fixture: unknown;
+    if (this.opts.structuredSequence && this.opts.structuredSequence.length > 0) {
+      const index = this.structuredCallCount % this.opts.structuredSequence.length;
+      fixture = this.opts.structuredSequence[index];
+      this.structuredCallCount++;
+    } else {
+      fixture = this.opts.structuredBySchema?.[req.schemaName] ?? this.opts.structured ?? {};
+    }
     const parsed = (req.schema as z.ZodType<T>).safeParse(fixture);
     if (!parsed.success) {
       throw new Error(`MockLLMProvider fixture failed schema: ${parsed.error.message}`);

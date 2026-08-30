@@ -13,6 +13,7 @@ import { PreviewTab } from "./_components/PreviewTab";
 import { ProjectContextSection } from "./_components/ProjectContextSection";
 import { StatsTab } from "./_components/StatsTab";
 import { VersionsTab } from "./_components/VersionsTab";
+import { EvalsTab } from "./_components/EvalsTab";
 import { VALID_TABS, type DetailTab } from "./constants";
 import { s } from "./styles";
 
@@ -58,6 +59,7 @@ export function SkillDetail({ skillId }: { skillId: string }) {
     { key: "context", label: t("detail.tabs.context"), icon: "FileText" as const },
     { key: "stats", label: t("detail.tabs.stats"), icon: "BarChart" as const },
     { key: "versions", label: t("detail.tabs.versions"), icon: "History" as const },
+    { key: "evals", label: t("detail.tabs.evals"), icon: "FlaskConical" as const },
   ];
 
   return (
@@ -81,6 +83,7 @@ export function SkillDetail({ skillId }: { skillId: string }) {
         {tab === "context" && <ProjectContextSection skill={skill} />}
         {tab === "stats" && <StatsTab skillId={skill.id} />}
         {tab === "versions" && <VersionsTab skill={skill} />}
+        {tab === "evals" && <EvalsTab skill={skill} />}
       </div>
     </div>
   );

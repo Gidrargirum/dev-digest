@@ -14,6 +14,14 @@ export const evalCases = pgTable(
       .references(() => workspaces.id, { onDelete: 'cascade' }),
     ownerKind: text('owner_kind', { enum: ['skill', 'agent'] }).notNull(),
     ownerId: uuid('owner_id').notNull(),
+    // Amendment A (AC-38): the baseline agent whose provider/model/system
+    // prompt/remaining skills supply both passes of a skill-owned case.
+    // Nullable at the DB level — required for `owner_kind = 'skill'` is a
+    // SERVICE-level invariant (EvalService), not a column constraint, so a
+    // case survives its baseline agent being deleted (AC-39 turns the next
+    // run into a 400, not a broken row). `set null` on delete, never cascade
+    // — the case must outlive the agent.
+    baselineAgentId: uuid('baseline_agent_id').references(() => agents.id, { onDelete: 'set null' }),
     name: text('name').notNull(),
     inputDiff: text('input_diff'),
     inputFiles: jsonb('input_files'),
@@ -28,6 +36,7 @@ export const evalCases = pgTable(
   },
   (t) => ({
     ownerIdx: index('eval_cases_owner_idx').on(t.ownerKind, t.ownerId),
+    baselineAgentIdx: index('eval_cases_baseline_agent_idx').on(t.baselineAgentId),
   }),
 );
 
@@ -42,7 +51,19 @@ export const evalBatches = pgTable(
       .notNull()
       .references(() => agents.id, { onDelete: 'cascade' }),
     // Snapshotted up front (AC-13) — never drifts if the agent is edited mid-run.
+    // For a skill batch (Amendment A) this is the BASELINE agent, not the
+    // skill under test — a batch records exactly one agent/version pair.
     agentVersion: integer('agent_version').notNull(),
+    // Amendment A (AC-40): what the batch actually measures. `'agent'`/agentId
+    // for the base spec's agent batches (default, matches every row inserted
+    // before this column existed). `'skill'`/skillId for a skill batch —
+    // `ownerId` nullable so the migration doesn't need a backfill on an
+    // already-populated table; the DTO falls back to `agentId` when null.
+    ownerKind: text('owner_kind', { enum: ['skill', 'agent'] }).notNull().default('agent'),
+    ownerId: uuid('owner_id'),
+    // The skill's version (`skills.version`) in force at execution time
+    // (AC-40) — null for an agent batch, which has no skill behind it.
+    skillVersion: integer('skill_version'),
     status: text('status', { enum: ['running', 'done', 'failed', 'cancelled'] })
       .notNull()
       .default('running'),
@@ -58,10 +79,16 @@ export const evalBatches = pgTable(
     noFlagRate: doublePrecision('no_flag_rate'),
     costUsd: doublePrecision('cost_usd'),
     durationMs: integer('duration_ms'),
+    // Batch-level macro-averaged marginal effect (AC-50) — null for an agent
+    // batch, which has no with/without distinction.
+    marginalRecall: doublePrecision('marginal_recall'),
+    marginalPrecision: doublePrecision('marginal_precision'),
+    marginalCitationAccuracy: doublePrecision('marginal_citation_accuracy'),
   },
   (t) => ({
     agentStartedIdx: index('eval_batches_agent_started_idx').on(t.agentId, t.startedAt),
     workspaceIdx: index('eval_batches_workspace_idx').on(t.workspaceId),
+    ownerStartedIdx: index('eval_batches_owner_started_idx').on(t.ownerKind, t.ownerId, t.startedAt),
   }),
 );
 

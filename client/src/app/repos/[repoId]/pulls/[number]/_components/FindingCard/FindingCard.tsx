@@ -108,6 +108,7 @@ export function FindingCard({
               icon="Check"
               disabled={pending}
               active={accepted}
+              style={accepted ? s.acceptActive : undefined}
               onClick={() => onAction?.("accept")}
             >
               {t("finding.accept")}
@@ -118,10 +119,22 @@ export function FindingCard({
               icon="X"
               disabled={pending}
               active={dismissed}
+              style={dismissed ? s.dismissActive : undefined}
               onClick={() => onAction?.("dismiss")}
             >
               {t("finding.dismiss")}
             </Button>
+            {muted && (
+              <Button
+                kind="ghost"
+                size="sm"
+                icon="RefreshCw"
+                disabled={pending}
+                title={t("finding.reset")}
+                aria-label={t("finding.reset")}
+                onClick={() => onAction?.("reset")}
+              />
+            )}
             <Button
               kind="ghost"
               size="sm"

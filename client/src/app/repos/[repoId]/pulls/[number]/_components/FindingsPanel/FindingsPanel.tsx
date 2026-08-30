@@ -5,7 +5,7 @@
 import React from "react";
 import { useTranslations } from "next-intl";
 import { Toggle, EmptyState, Icon, SEV, type Severity } from "@devdigest/ui";
-import type { FindingRecord } from "@devdigest/shared";
+import type { FindingRecord, PrFile } from "@devdigest/shared";
 import { FindingCard } from "../FindingCard";
 import { EvalCaseEditor } from "@/components/eval-case-editor";
 import { useFindingAction } from "@/lib/hooks/reviews";
@@ -21,6 +21,9 @@ export function FindingsPanel({
   targetFindingId = null,
   targetNonce = 0,
   agentId = null,
+  prTitle = "",
+  prBody = null,
+  prFiles = [],
 }: {
   findings: FindingRecord[];
   prId: string;
@@ -36,6 +39,12 @@ export function FindingsPanel({
    *  case" — AC-1). `null` for legacy CI-imported reviews with no agent_id;
    *  the action stays wired but has no agent to attribute the case to. */
   agentId?: string | null;
+  /** The PR's own title/body/files — already loaded by the page, threaded
+   *  down so "Turn into eval case" can seed a real `input_diff`/`input_meta`
+   *  (AC-5) instead of opening the editor empty. */
+  prTitle?: string;
+  prBody?: string | null;
+  prFiles?: PrFile[];
 }) {
   const t = useTranslations("prReview");
   const action = useFindingAction();
@@ -167,8 +176,9 @@ export function FindingsPanel({
 
       {agentId && evalSeedFinding && (
         <EvalCaseEditor
-          agentId={agentId}
-          seed={buildEvalSeed(evalSeedFinding)}
+          ownerKind="agent"
+          ownerId={agentId}
+          seed={buildEvalSeed(evalSeedFinding, { title: prTitle, body: prBody, files: prFiles })}
           onClose={() => setEvalSeedFinding(null)}
         />
       )}
